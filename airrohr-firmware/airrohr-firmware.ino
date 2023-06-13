@@ -1884,6 +1884,7 @@ static void webserver_config_send_body_get(String &page_content)
 	};
 
 	debug_outln_info(F("begin webserver_config_body_get ..."));
+
 	page_content += F("<form method='POST' action='/config' style='width:100%;'>\n"
 					  "<input class='radio' id='r1' name='group' type='radio' checked>"
 					  "<input class='radio' id='r2' name='group' type='radio'>"
@@ -1905,6 +1906,7 @@ static void webserver_config_send_body_get(String &page_content)
 	{ // scan for wlan ssids
 		page_content += F("<div id='wifilist'>" INTL_WIFI_NETWORKS "</div><br/>");
 	}
+
 	page_content += FPSTR(TABLE_TAG_OPEN);
 	add_form_input(page_content, Config_wlanssid, FPSTR(INTL_FS_WIFI_NAME), LEN_WLANSSID - 1);
 	add_form_input(page_content, Config_wlanpwd, FPSTR(INTL_PASSWORD), LEN_CFG_PASSWORD - 1);
@@ -1975,6 +1977,7 @@ static void webserver_config_send_body_get(String &page_content)
 	page_content = FPSTR(WEB_BR_LF_B);
 	page_content += F(INTL_FIRMWARE);
 	page_content += FPSTR(WEB_B_BR);
+
 	add_form_checkbox(Config_auto_update, FPSTR(INTL_AUTO_UPDATE));
 	add_form_checkbox(Config_use_beta, FPSTR(INTL_USE_BETA));
 
@@ -2017,6 +2020,15 @@ static void webserver_config_send_body_get(String &page_content)
 	add_form_checkbox_sensor(Config_bmx280_read, FPSTR(INTL_BMX280));
 	add_form_checkbox_sensor(Config_sht3x_read, FPSTR(INTL_SHT3X));
 	add_form_checkbox_sensor(Config_scd30_read, FPSTR(INTL_SCD30));
+
+	// Paginate page after ~ 1500 Bytes
+	server.sendContent(page_content);
+	page_content = emptyString;
+
+	page_content += FPSTR(TABLE_TAG_OPEN);
+	add_form_input(page_content, Config_temp_correction, FPSTR(INTL_TEMP_CORRECTION), LEN_TEMP_CORRECTION - 1);
+	add_form_input(page_content, Config_dnms_correction, FPSTR(INTL_DNMS_CORRECTION), LEN_DNMS_CORRECTION - 1);
+	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
 
 	// Paginate page after ~ 1500 Bytes
 	server.sendContent(page_content);
@@ -2101,6 +2113,7 @@ static void webserver_config_send_body_get(String &page_content)
 	page_content += form_submit(FPSTR(INTL_SAVE_AND_RESTART));
 	page_content += FPSTR(BR_TAG);
 	page_content += FPSTR(WEB_BR_FORM);
+
 	if (wificonfig_loop)
 	{ // scan for wlan ssids
 		page_content += F("<script>window.setTimeout(load_wifi_list,1000);</script>");
@@ -2110,6 +2123,9 @@ static void webserver_config_send_body_get(String &page_content)
 	page_content = emptyString;
 }
 
+/*****************************************************************************
+ * Webserver config: post the canged page to config file and restart appl.   *
+ *****************************************************************************/
 static void webserver_config_send_body_post(String &page_content)
 {
 	String masked_pwd;
@@ -2119,10 +2135,12 @@ static void webserver_config_send_body_post(String &page_content)
 		ConfigShapeEntry c;
 		memcpy_P(&c, &configShape[e], sizeof(ConfigShapeEntry));
 		const String s_param(c.cfg_key());
+
 		if (!server.hasArg(s_param))
 		{
 			continue;
 		}
+
 		const String server_arg(server.arg(s_param));
 
 		switch (c.cfg_type)
@@ -2130,16 +2148,20 @@ static void webserver_config_send_body_post(String &page_content)
 		case Config_Type_UInt:
 			*(c.cfg_val.as_uint) = server_arg.toInt();
 			break;
+
 		case Config_Type_Time:
 			*(c.cfg_val.as_uint) = server_arg.toInt() * 1000;
 			break;
+
 		case Config_Type_Bool:
 			*(c.cfg_val.as_bool) = (server_arg == "1");
 			break;
+
 		case Config_Type_String:
 			strncpy(c.cfg_val.as_str, server_arg.c_str(), c.cfg_len);
 			c.cfg_val.as_str[c.cfg_len] = '\0';
 			break;
+
 		case Config_Type_Password:
 			if (server_arg.length())
 			{
@@ -2201,6 +2223,10 @@ static void webserver_config()
 		{
 			display_debug(F("Writing config"), F("and restarting"));
 			sensor_restart();
+		}
+		else
+		{
+			display_debug(F("ERROR Writing config"), F("For restart Power OFF/ON"));
 		}
 	}
 }
@@ -2621,16 +2647,20 @@ static void webserver_status()
 	if (WiFi.status() != WL_CONNECTED)
 	{
 		sendHttpRedirect();
+
+		debug_outln_info(F("ws: status => WiFi not connected ..."));
 		return;
 	}
 
 	RESERVE_STRING(page_content, XLARGE_STR);
 	start_html_page(page_content, FPSTR(INTL_DEVICE_STATUS));
 
-	debug_outln_info(F("ws: status ..."));
+	debug_outln_info(F("ws: status => create webpage ..."));
+
 	server.sendContent(page_content);
 	page_content = F("<table cellspacing='0' cellpadding='5' class='v'>\n"
 					 "<thead><tr><th> " INTL_PARAMETER "</th><th>" INTL_VALUE "</th></tr></thead>");
+
 	String versionHtml(SOFTWARE_VERSION);
 	versionHtml += F("/ST:");
 	versionHtml += String(!airrohr_selftest_failed);
@@ -2641,6 +2671,7 @@ static void webserver_status()
 #endif
 
 	versionHtml.replace("/", FPSTR(BR_TAG));
+
 	add_table_row_from_value(page_content, FPSTR(INTL_FIRMWARE), versionHtml);
 	add_table_row_from_value(page_content, F("Free Memory"), String(ESP.getFreeHeap()));
 	
@@ -2698,18 +2729,48 @@ static void webserver_status()
 	}
 
 	if (cfg::scd30_read)
-	{
-		if (scd30.getAutoSelfCalibration() == true)
-			add_table_row_from_value(page_content, F("SCD30 Auto Calibration"), "enabled");
-		else
-			add_table_row_from_value(page_content, F("SCD30 Auto Calibration"), "disabled");
+	{// set data for webpage section SCD-30
 
-		uint16_t settingVal;
+		page_content += FPSTR(EMPTY_ROW);
+
+		add_table_row_from_value(page_content,  FPSTR( SENSORS_SCD30), emptyString);
+
+		uint16_t settingVal = 0;
+
+		scd30.getFirmwareVersion(&settingVal);
+		versionHtml = F("Firmware Version:   V ") + String( ((float)settingVal) / 100);
+		versionHtml += String( BR_TAG);
+		versionHtml += F("Auto Calibration = ");
+		versionHtml += scd30.getAutoSelfCalibration() == true ? F("enabled") : F("disabled");
+		versionHtml += String( BR_TAG);
 		scd30.getMeasurementInterval(&settingVal);
-		add_table_row_from_value(page_content, F("SCD30 measurement interval"), String(settingVal));
+		versionHtml += F("Measurement interval =  ") + String( settingVal) + String("s");
+		versionHtml += String( BR_TAG);
+		float offsetTemp = scd30.getTemperatureOffset();
+		versionHtml += F("Temperature offset = ") + String( offsetTemp) + String("°C");
+		versionHtml += String( BR_TAG);
+		scd30.getForcedRecalibration(&settingVal);
+		versionHtml += F("CO₂ offset = ") + String( settingVal) + String("ppm");
 
-		scd30.getTemperatureOffset(&settingVal);
-		add_table_row_from_value(page_content, F("SCD30 temperature offset"), String(settingVal));
+		add_table_row_from_value(page_content, F("Settings"), versionHtml);
+
+		// dit geeft een browser fout, 1 line to much, page not open in browser, WHY?????.
+		//scd30.getFirmwareVersion(&settingVal);
+		//add_table_row_from_value(page_content, F("Firmware Version"), String( ((float)settingVal) / 100));
+
+		// if (scd30.getAutoSelfCalibration() == true)
+		// 	add_table_row_from_value(page_content, F("Auto Calibration"), "enabled");
+		// else
+		// 	add_table_row_from_value(page_content, F("Auto Calibration"), "disabled");
+			
+		//scd30.getMeasurementInterval(&settingVal);
+		//add_table_row_from_value(page_content, F("Measurement interval"), String( settingVal));
+
+		//float offsetTemp = scd30.getTemperatureOffset();
+		//add_table_row_from_value(page_content, F("Temperature offset"), String( offsetTemp));
+
+		//scd30.getForcedRecalibration(&settingVal);
+		//add_table_row_from_value(page_content, F("CO₂ offset"), String( settingVal) + String(" ppm"));
 	}
 
 	page_content += FPSTR(EMPTY_ROW);
@@ -2798,6 +2859,8 @@ static void webserver_status()
 
 	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
 	end_html_page(page_content);
+
+	debug_outln_info(F("ws: status => webpage send too ..."));
 }
 
 /*****************************************************************
@@ -6690,7 +6753,7 @@ static void powerOnTestSensors()
 	{
 		debug_outln_info(F("Read SCD30..."));
 
-		if (!scd30.begin())		//set autoCalibrate flag, default false.
+		if (!scd30.begin())		//set autoCalibrate flag to false (default).
 		{
 			debug_outln_error(F("Check SCD30 wiring"));
 			scd30_init_failed = true;
@@ -6699,13 +6762,20 @@ static void powerOnTestSensors()
 		{
 			if( scd30.isConnected())
 			{
-				// set Measurement Time Interval to 30 sec.
+				// set Measurement Time Interval to 30 seconds between measurements.
 				scd30.setMeasurementInterval(MEASUREMENT_INTERVAL_SCD30_S);
 
+				// Optionally set temperature offset to ec. 5°C.
 				float tempOffset = readCorrectionOffset(cfg::temp_correction);
     			scd30.setTemperatureOffset(tempOffset);
 
-				debug_outln_info(F("SCD30 connected..."));
+				// set Recalibration reference value to SCD30. (standard 400ppm)
+				tempOffset = readCorrectionOffset(cfg::dnms_correction);
+				scd30.setForcedRecalibrationFactor((uint16_t)tempOffset);
+
+				uint16_t settingVal = 0;
+				scd30.getFirmwareVersion(&settingVal);
+				debug_outln_info(F("SCD30 connected... Version: ") + String( ((float)settingVal) / 100));
 			}
 			else
 			{
@@ -7459,11 +7529,14 @@ void loop(void)
 
 		if (cfg::scd30_read && (!scd30_init_failed))
 		{
-			// getting temperature and humidity (optional)
-			fetchSensorSCD30(result);
-			data += result;
-			sum_send_time += sendSensorCommunity(result, SCD30_API_PIN, FPSTR(SENSORS_SCD30), "SCD30_");
-			result = emptyString;
+			if( scd30.isConnected() )
+			{// getting temperature and humidity (optional)
+				fetchSensorSCD30(result);
+
+				data += result;
+				sum_send_time += sendSensorCommunity(result, SCD30_API_PIN, FPSTR(SENSORS_SCD30), "SCD30_");
+				result = emptyString;
+			}
 		}
 
 		if (cfg::ds18b20_read)
