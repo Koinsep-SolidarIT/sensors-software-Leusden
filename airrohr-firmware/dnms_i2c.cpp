@@ -68,7 +68,8 @@ int16_t dnms_read_data_ready(uint16_t *data_ready) {
 }
 
 
-int16_t dnms_read_leq(struct dnms_measurements *leq) {
+int16_t dnms_read_leq(struct dnms_measurements *leq) 
+{
   int16_t ret;
   uint16_t idx;
   union {
@@ -79,8 +80,10 @@ int16_t dnms_read_leq(struct dnms_measurements *leq) {
 
   ret = dnms_i2c_read_cmd(DNMS_I2C_ADDRESS, DNMS_CMD_READ_LEQ, data->uu, DNMS_NUM_WORDS(data));
   if (ret != STATUS_OK)
+  {
     return ret;
-
+  }
+  
   DNMS_WORDS_TO_BYTES(data->uu, DNMS_NUM_WORDS(data));
 
   idx = 0;
