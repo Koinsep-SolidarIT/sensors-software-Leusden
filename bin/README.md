@@ -1,1 +1,1 @@
-Beta firmware and flashers
+Beta firmware and flasher
