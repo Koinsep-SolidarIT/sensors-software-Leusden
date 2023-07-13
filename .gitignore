@@ -7,5 +7,4 @@ compile_mac.sh
 .vscode
 .vs
 
-bin/*
-Doc/*
+
