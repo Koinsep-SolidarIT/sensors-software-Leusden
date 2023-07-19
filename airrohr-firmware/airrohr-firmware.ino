@@ -205,6 +205,9 @@ namespace cfg
 	bool gps_read = GPS_READ;
 	char temp_correction[LEN_TEMP_CORRECTION] = TEMP_CORRECTION;
 
+	char scd30_co2_correction[LEN_DNMS_CORRECTION] = DNMS_CORRECTION;
+	char scd30_temp_correction[LEN_TEMP_CORRECTION] = TEMP_CORRECTION;
+
 	// send to "APIs"
 	bool send2dusti = SEND2SENSORCOMMUNITY;
 	bool send2madavi = SEND2MADAVI;
@@ -280,7 +283,7 @@ namespace cfg
 		if (!*cfg::fs_ssid)
 		{
 			strcpy(cfg::fs_ssid, SSID_BASENAME);
-			strcat(cfg::fs_ssid, id);
+			strcat(cfg::fs_ssid, id);				// chipid
 		}
 	}
 
@@ -2022,12 +2025,12 @@ static void webserver_config_send_body_get(String &page_content)
 	add_form_checkbox_sensor(Config_scd30_read, FPSTR(INTL_SCD30));
 
 	// Paginate page after ~ 1500 Bytes
-	server.sendContent(page_content);
-	page_content = emptyString;
+	//server.sendContent(page_content);
+	//page_content = emptyString;
 
 	page_content += FPSTR(TABLE_TAG_OPEN);
-	add_form_input(page_content, Config_temp_correction, FPSTR(INTL_TEMP_CORRECTION), LEN_TEMP_CORRECTION - 1);
-	add_form_input(page_content, Config_dnms_correction, FPSTR(INTL_DNMS_CORRECTION), LEN_DNMS_CORRECTION - 1);
+	add_form_input(page_content, ConfigShapeId::Config_scd30_temp_correction, FPSTR(INTL_TEMP_CORRECTION), LEN_TEMP_CORRECTION - 1);
+	add_form_input(page_content, ConfigShapeId::Config_scd30_co2_correction, FPSTR(INTL_SCD30_CO2_CORRECTION), LEN_DNMS_CORRECTION - 1);
 	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
 
 	// Paginate page after ~ 1500 Bytes
@@ -3658,11 +3661,12 @@ static void sendmqtt(const String &data, const char *host, const int port)
 #if defined(ESP8266)
 	if (!mqtt_client.connected())
 	{
-		mqtt_client.setServer(host, port);
+		mqtt_client.setServer( host, port);
 
 		if (mqtt_client.connect(cfg::mqtt_client_id, cfg::mqtt_user, cfg::mqtt_pwd))
 		{
 			debug_outln_info( F("mqtt: connected"));
+			//mqtt_client.setBufferSize(LARGE_STR);		// increase MQTT buffer size.
 		}
 		else
 		{
@@ -3697,6 +3701,7 @@ static void sendmqtt(const String &data, const char *host, const int port)
 				payload = "{\"value_type\":\"" + key + "\",\"value\":" + val + "}";
 				debug_outln_info(F("mqtt: publishing '%s' ... "), (String &)payload);
 
+				// send sensor data frame one by one.
 				if (mqtt_client.publish( cfg::mqtt_topic, payload.c_str()) )
 				{
 					debug_outln_info(F("ok"));
@@ -3827,12 +3832,14 @@ static void fetchSensorDHT(String &s)
 	{
 		auto t = dht.readTemperature();
 		auto h = dht.readHumidity();
+
 		if (isnan(t) || isnan(h))
 		{
 			delay(100);
 			t = dht.readTemperature(false);
 			h = dht.readHumidity();
 		}
+
 		if (isnan(t) || isnan(h))
 		{
 			debug_outln_error(F("DHT11/DHT22 read failed"));
@@ -6766,11 +6773,11 @@ static void powerOnTestSensors()
 				scd30.setMeasurementInterval(MEASUREMENT_INTERVAL_SCD30_S);
 
 				// Optionally set temperature offset to ec. 5°C.
-				float tempOffset = readCorrectionOffset(cfg::temp_correction);
+				float tempOffset = readCorrectionOffset(cfg::scd30_temp_correction);
     			scd30.setTemperatureOffset(tempOffset);
 
 				// set Recalibration reference value to SCD30. (standard 400ppm)
-				tempOffset = readCorrectionOffset(cfg::dnms_correction);
+				tempOffset = readCorrectionOffset(cfg::scd30_co2_correction);
 				scd30.setForcedRecalibrationFactor((uint16_t)tempOffset);
 
 				uint16_t settingVal = 0;
@@ -7019,7 +7026,7 @@ static unsigned long sendDataToOptionalApis(const String &data)
 
 #if defined(ESP8266)
 		// MQTT send process.
-		if (cfg::send2mqtt && mqtt_client.connected())
+		if ( cfg::send2mqtt )
 		{
 			debug_out( String( DBG_TXT_SENDING_TO) + String("mqtt: "), DEBUG_MIN_INFO);
 			starttime_MQTT = act_milli;
@@ -7162,6 +7169,7 @@ void setup(void)
 	}
 
 	// MQTT broker address and port. => set in sendmqtt( , , )
+	// MQTT broker can use LWT settings to inform connected MQTT clients => current status fijnstof sensor client.
   	// mqtt_client.setServer(cfg::mqtt_server, cfg::mqtt_port);
 
 } // end setup()

@@ -55,8 +55,8 @@ enum ConfigShapeId
 	Config_scd30_read,
 	Config_ds18b20_read,
 	Config_dnms_read,
-	Config_dnms_correction,
-	Config_temp_correction,
+	Config_dnms_correction,						// 25
+	Config_temp_correction,						// 26
 	Config_height_above_sealevel,
 	Config_gps_read,
 	Config_send2dusti,
@@ -102,6 +102,8 @@ enum ConfigShapeId
 	Config_pwd_influx,
 	Config_measurement_name_influx,
 	Config_ssl_influx,
+	Config_scd30_co2_correction,						// 72
+	Config_scd30_temp_correction,						// 73
 };
 
 static constexpr char CFG_KEY_CURRENT_LANG[] PROGMEM = "current_lang";
@@ -177,6 +179,9 @@ static constexpr char CFG_KEY_PWD_INFLUX[] PROGMEM = "pwd_influx";
 static constexpr char CFG_KEY_MEASUREMENT_NAME_INFLUX[] PROGMEM = "measurement_name_influx";
 static constexpr char CFG_KEY_SSL_INFLUX[] PROGMEM = "ssl_influx";
 
+static constexpr char CFG_KEY_SCD30_CO2_CORRECTION[] PROGMEM = "scd30_co2_correction";
+static constexpr char CFG_KEY_SCD30_TEMP_CORRECTION[] PROGMEM = "scd30_temp_correction";
+
 // MQTT
 static constexpr char CFG_KEY_SEND2MQTT[] PROGMEM = "send2mqtt";
 static constexpr char CFG_KEY_PORT_MQTT[] PROGMEM = "port_mqtt";
@@ -184,7 +189,8 @@ static constexpr char CFG_KEY_USER_MQTT[] PROGMEM = "user_mqtt";
 static constexpr char CFG_KEY_PWD_MQTT[] PROGMEM = "pwd_mqtt";
 //
 
-static constexpr ConfigShapeEntry configShape[] PROGMEM = {
+static constexpr ConfigShapeEntry configShape[] PROGMEM = 
+{
 	{ Config_Type_String, sizeof(cfg::current_lang)-1, CFG_KEY_CURRENT_LANG, cfg::current_lang },
 	{ Config_Type_String, sizeof(cfg::wlanssid)-1, CFG_KEY_WLANSSID, cfg::wlanssid },
 	{ Config_Type_Password, sizeof(cfg::wlanpwd)-1, CFG_KEY_WLANPWD, cfg::wlanpwd },
@@ -210,8 +216,8 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_Bool, 0, CFG_KEY_SCD30_READ, &cfg::scd30_read },
 	{ Config_Type_Bool, 0, CFG_KEY_DS18B20_READ, &cfg::ds18b20_read },
 	{ Config_Type_Bool, 0, CFG_KEY_DNMS_READ, &cfg::dnms_read },
-	{ Config_Type_String, sizeof(cfg::dnms_correction)-1, CFG_KEY_DNMS_CORRECTION, cfg::dnms_correction },
-	{ Config_Type_String, sizeof(cfg::temp_correction)-1, CFG_KEY_TEMP_CORRECTION, cfg::temp_correction },
+	{ Config_Type_String, sizeof(cfg::dnms_correction)-1, CFG_KEY_DNMS_CORRECTION, cfg::dnms_correction },					// 25
+	{ Config_Type_String, sizeof(cfg::temp_correction)-1, CFG_KEY_TEMP_CORRECTION, cfg::temp_correction },					// 26
 	{ Config_Type_String, sizeof(cfg::height_above_sealevel)-1, CFG_KEY_HEIGHT_ABOVE_SEALEVEL, cfg::height_above_sealevel },
 	{ Config_Type_Bool, 0, CFG_KEY_GPS_READ, &cfg::gps_read },
 	{ Config_Type_Bool, 0, CFG_KEY_SEND2DUSTI, &cfg::send2dusti },
@@ -257,6 +263,9 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_Password, sizeof(cfg::pwd_influx)-1, CFG_KEY_PWD_INFLUX, cfg::pwd_influx },
 	{ Config_Type_String, sizeof(cfg::measurement_name_influx)-1, CFG_KEY_MEASUREMENT_NAME_INFLUX, cfg::measurement_name_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_SSL_INFLUX, &cfg::ssl_influx },
+
+	{ Config_Type_String, sizeof(cfg::scd30_co2_correction)-1, CFG_KEY_SCD30_CO2_CORRECTION, cfg::scd30_co2_correction },					// 25
+	{ Config_Type_String, sizeof(cfg::scd30_temp_correction)-1, CFG_KEY_SCD30_TEMP_CORRECTION, cfg::scd30_temp_correction },					// 26
 
 	// TODO: MQTT gwt and set variable data.
 };
