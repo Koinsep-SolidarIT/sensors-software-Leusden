@@ -71,8 +71,18 @@ String		url_influx
 UInt		port_influx
 String		user_influx
 Password	pwd_influx
+Bool		send2mqtt
+String		mqtt_server
+String		mqtt_topic
+UInt		mqtt_port
+String		mqtt_user
+Password	mqtt_pwd
 String		measurement_name_influx
 Bool		ssl_influx
+Bool		has_fix_ip
+
+String		sdc30_CO2_correction
+String		sdc30_temp_correction
 """
 
 with open("airrohr-cfg.h", "w") as h:
@@ -80,6 +90,8 @@ with open("airrohr-cfg.h", "w") as h:
 
 // This file is generated, please do not edit.
 // Change airrohr-cfg.h.py instead.
+// update MQTT juni 2023
+// add Bool Fix IP
 
 enum ConfigEntryType : unsigned short {
 	Config_Type_Bool,

@@ -2,6 +2,8 @@
 
 // This file is generated, please do not edit.
 // Change airrohr-cfg.h.py instead.
+// update MQTT juni 2023
+// add Bool Fix IP
 
 enum ConfigEntryType : unsigned short 
 {
@@ -100,10 +102,17 @@ enum ConfigShapeId
 	Config_port_influx,
 	Config_user_influx,
 	Config_pwd_influx,
+	Config_send2mqtt,
+	Config_mqtt_server,
+	Config_mqtt_topic,
+	Config_mqtt_port,
+	Config_mqtt_user,
+	Config_mqtt_pwd,
 	Config_measurement_name_influx,
 	Config_ssl_influx,
-	Config_scd30_co2_correction,						// 72
-	Config_scd30_temp_correction,						// 73
+	Config_has_fix_ip,
+	Config_scd30_co2_correction,						// 73
+	Config_scd30_temp_correction,						// 74
 };
 
 static constexpr char CFG_KEY_CURRENT_LANG[] PROGMEM = "current_lang";
@@ -176,18 +185,22 @@ static constexpr char CFG_KEY_URL_INFLUX[] PROGMEM = "url_influx";
 static constexpr char CFG_KEY_PORT_INFLUX[] PROGMEM = "port_influx";
 static constexpr char CFG_KEY_USER_INFLUX[] PROGMEM = "user_influx";
 static constexpr char CFG_KEY_PWD_INFLUX[] PROGMEM = "pwd_influx";
+
+// MQTT
+static constexpr char CFG_KEY_SEND2MQTT[] PROGMEM = "send2mqtt";
+static constexpr char CFG_KEY_MQTT_SERVER[] PROGMEM = "mqtt_server";
+static constexpr char CFG_KEY_MQTT_TOPIC[] PROGMEM = "mqtt_topic";
+static constexpr char CFG_KEY_MQTT_PORT[] PROGMEM = "mqtt_port";
+static constexpr char CFG_KEY_MQTT_USER[] PROGMEM = "mqtt_user";
+static constexpr char CFG_KEY_MQTT_PWD[] PROGMEM = "mqtt_pwd";
+//
 static constexpr char CFG_KEY_MEASUREMENT_NAME_INFLUX[] PROGMEM = "measurement_name_influx";
 static constexpr char CFG_KEY_SSL_INFLUX[] PROGMEM = "ssl_influx";
+static constexpr char CFG_KEY_HAS_FIX_IP[] PROGMEM = "has_fix_ip";
 
 static constexpr char CFG_KEY_SCD30_CO2_CORRECTION[] PROGMEM = "scd30_co2_correction";
 static constexpr char CFG_KEY_SCD30_TEMP_CORRECTION[] PROGMEM = "scd30_temp_correction";
 
-// MQTT
-static constexpr char CFG_KEY_SEND2MQTT[] PROGMEM = "send2mqtt";
-static constexpr char CFG_KEY_PORT_MQTT[] PROGMEM = "port_mqtt";
-static constexpr char CFG_KEY_USER_MQTT[] PROGMEM = "user_mqtt";
-static constexpr char CFG_KEY_PWD_MQTT[] PROGMEM = "pwd_mqtt";
-//
 
 static constexpr ConfigShapeEntry configShape[] PROGMEM = 
 {
@@ -261,8 +274,17 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM =
 	{ Config_Type_UInt, 0, CFG_KEY_PORT_INFLUX, &cfg::port_influx },
 	{ Config_Type_String, sizeof(cfg::user_influx)-1, CFG_KEY_USER_INFLUX, cfg::user_influx },
 	{ Config_Type_Password, sizeof(cfg::pwd_influx)-1, CFG_KEY_PWD_INFLUX, cfg::pwd_influx },
+
+	{ Config_Type_Bool, 0, CFG_KEY_SEND2MQTT, &cfg::send2mqtt },
+	{ Config_Type_String, sizeof(cfg::mqtt_server)-1, CFG_KEY_MQTT_SERVER, cfg::mqtt_server },
+	{ Config_Type_String, sizeof(cfg::mqtt_topic)-1, CFG_KEY_MQTT_TOPIC, cfg::mqtt_topic },
+	{ Config_Type_UInt, 0, CFG_KEY_MQTT_PORT, &cfg::mqtt_port },
+	{ Config_Type_String, sizeof(cfg::mqtt_user)-1, CFG_KEY_MQTT_USER, cfg::mqtt_user },
+	{ Config_Type_Password, sizeof(cfg::mqtt_pwd)-1, CFG_KEY_MQTT_PWD, cfg::mqtt_pwd },
+	
 	{ Config_Type_String, sizeof(cfg::measurement_name_influx)-1, CFG_KEY_MEASUREMENT_NAME_INFLUX, cfg::measurement_name_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_SSL_INFLUX, &cfg::ssl_influx },
+	{ Config_Type_Bool, 0, CFG_KEY_HAS_FIX_IP, &cfg::has_fix_ip },
 
 	{ Config_Type_String, sizeof(cfg::scd30_co2_correction)-1, CFG_KEY_SCD30_CO2_CORRECTION, cfg::scd30_co2_correction },					// 25
 	{ Config_Type_String, sizeof(cfg::scd30_temp_correction)-1, CFG_KEY_SCD30_TEMP_CORRECTION, cfg::scd30_temp_correction },					// 26

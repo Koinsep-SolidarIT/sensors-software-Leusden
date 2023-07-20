@@ -72,6 +72,12 @@ static const char HOST_FSAPP[] PROGMEM = "server.chillibits.com";
 static const char URL_FSAPP[] PROGMEM = "/data.php";
 #define PORT_FSAPP 80
 
+// defaut statuc ip
+static const char STATIC_IP[] PROGMEM = "192.168.1.1";
+static const char STATIC_SUBNET[] PROGMEM = "255.255.255.0";
+static const char STATIC_GATEWAY[] PROGMEM = "192.168.1.254";
+static const char STATIC_DNS[] PROGMEM = "192.168.1.254";
+
 static const char HOST_AIRCMS[] PROGMEM = "doiot.ru";
 static const char URL_AIRCMS[] PROGMEM = "/php/sensors.php?h=";
 // As of 2019/09 uses invalid certificates on ssl/port 443 and does not support Maximum Fragment Length Negotiation (MFLN)
@@ -102,14 +108,18 @@ static const char URL_INFLUX[] PROGMEM = "/write?db=sensorcommunity";
 #define PWD_INFLUX ""
 static const char MEASUREMENT_NAME_INFLUX[] PROGMEM = "feinstaub";
 #define SSL_INFLUX 0
+#define HAS_FIX_IP 0
 
 // define MQTT Definitionen
-static const char SERVER_MQTT[]  PROGMEM = "mqtt.opensensors.io";
+static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 #define MQTT_PORT 1883
-#define MQTT_USER ""
+#define MQTT_USER "Admin"
 #define MQTT_PWD ""
 #define MQTT_CLIENT_ID ""
-#define MQTT_TOPIC "SCD30"
+#define MQTT_TOPIC "airRohr"
+#define MQTT_LWT "LWT"
+#define MQTT_LWT_MESSAGE_OFF "Offline"
+#define MQTT_LWT_MESSAGE_ON "Online"
 
 //  === pin assignments for NodeMCU V2 board ===================================
 #if defined(ESP8266)
@@ -296,6 +306,7 @@ static const char SERVER_MQTT[]  PROGMEM = "mqtt.opensensors.io";
 // SCD30, temperature, pressure, CO2
 #define SCD30_READ 0
 #define SCD30_API_PIN 17
+#define CO2_CORRECTION "422"
 
 // DS18B20, temperature
 #define DS18B20_READ 0

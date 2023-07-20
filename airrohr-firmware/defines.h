@@ -37,11 +37,14 @@
 #define LEN_USER_INFLUX 65
 #define LEN_PASS_INFLUX 90
 #define LEN_MEASUREMENT_NAME_INFLUX 100
+#define LEN_MQTT_HEADER 40 
 
 #define LEN_HOST_CUSTOM 100
 #define LEN_URL_CUSTOM 100
 #define LEN_USER_CUSTOM 65
 #define MAX_PORT_DIGITS 5
+
+#define LEN_STATIC_ADRESS  16
 
 // define debug levels
 #define DEBUG_ERROR 1

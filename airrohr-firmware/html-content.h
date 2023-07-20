@@ -1,6 +1,6 @@
 
 
-
+#define INTL_FORUM "Forum Sensor.Community"
 const char TXT_CONTENT_TYPE_JSON[] PROGMEM = "application/json";
 const char TXT_CONTENT_TYPE_INFLUXDB[] PROGMEM = "application/x-www-form-urlencoded";
 const char TXT_CONTENT_TYPE_TEXT_HTML[] PROGMEM = "text/html; charset=utf-8";
@@ -59,29 +59,29 @@ const char WEB_PAGE_HEADER[] PROGMEM = "<!DOCTYPE html><html lang='" INTL_LANG "
 const char WEB_PAGE_STATIC_CSS[] PROGMEM = "	\
 body{font-family:Arial,sans-serif;margin:0}	\
 .content{margin:10px}	\
-.footer{height:48px;background:#f5f5f5;width:100%}	\
+.footer{height:48px;background:#f5f211;width:100%}	\
 .r{text-align:right}	\
 td{vertical-align:top}	\
-.v>tbody>tr:nth-child(odd){background:#efefef}	\
-.b{text-decoration:none;padding:10px;background:#2a9;color:#fff;display:block;width:auto;border-radius:5px;}	\
+.v>tbody>tr:nth-child(odd){background:#e7e6d1}	\
+.b{text-decoration:none;padding:10px;background:#055d52;color:#fff;display:block;width:auto;border-radius:5px;}	\
 .wifi{background:0 0;color:#00f;padding:5px;display:inline;border:0;}	\
 input[type=text]{width:100%}	\
 input[type=password]{width:100%}	\
 input[type=submit]{color:#fff;text-align:left;cursor:pointer;border-radius:5px;font-size:medium;background:#b33;padding:9px!important;width:100%;border-style:none}	\
-input[type=submit]:hover{background:#d44}\
-.s_green{padding:9px !important;width:100%;border-style:none;background:#3ba;color:#fff;text-align:left}\
+input[type=submit]:hover{background:#167908}\
+.s_green{padding:9px !important;width:100%;border-style:none;background:#055d52;color:#fff;text-align:left}\
 .tabs{display:flex;flex-direction:row;align-items:stretch;align-content:flex-end;justify-content:flex-start}\
 .tab{padding:10px 20px;display:inline-block;color:#333}\
-.panels{min-height:200px;overflow:hidden;padding:20px;border:2px solid #3ba;margin-bottom:1em;}\
+.panels{min-height:200px;overflow:hidden;padding:20px;border:2px solid #044f45;margin-bottom:1em;}\
 .radio{display:none}.panel{display:none}\
-.canvas{min-height:118px;background:#3ba;margin-bottom:20px;}\
+.canvas{min-height:118px;background:#055d52;margin-bottom:20px;}\
 #r4:checked~.panels>#panel4,#r1:checked~.panels>#panel1,#r3:checked~.panels>#panel3,#r2:checked~.panels>#panel2{display:block}\
-#r4:checked~.tabs>#tab4,#r1:checked~.tabs>#tab1,#r3:checked~.tabs>#tab3,#r2:checked~.tabs>#tab2{background:#3ba;color:#fff}";
+#r4:checked~.tabs>#tab4,#r1:checked~.tabs>#tab1,#r3:checked~.tabs>#tab3,#r2:checked~.tabs>#tab2{background:#055d52;color:#fff}";
 
 #define STATIC_PREFIX "/" INTL_LANG "_s1"
 
 const char WEB_PAGE_HEADER_HEAD[] PROGMEM = "<meta name='viewport' content='width=device-width'/>	\
-<meta name='theme-color' content='#3ba'>	\
+<meta name='theme-color' content='#055d52'>	\
 <link rel='stylesheet' href='" STATIC_PREFIX "?r=css'>	\
 </style>	\
 </head><body>	\
@@ -100,12 +100,12 @@ const char TABLE_TAG_CLOSE_BR[] PROGMEM = "</table>";
 const char EMPTY_ROW[] PROGMEM = "<tr><td colspan='3'>&nbsp;</td></tr>";
 
 const char WEB_PAGE_FOOTER[] PROGMEM = "<br/><br/>"
-                "<a class='b' href='/' style='display:inline;'>" INTL_BACK_TO_HOME "</a><br/><br/><br/>"
-		"</div><footer class='footer'><div style='padding:16px'>"
-		"<a href='https://codefor.de/stuttgart/' target='_blank' rel='noreferrer' style='color:#3ba;'>"
-		"&copy; Open Knowledge Lab Stuttgart a.o. (Code for Germany)</a>&nbsp;&nbsp("
-                "<a href='https://github.com/opendata-stuttgart/sensors-software/labels/bug' target='_blank' rel='noreferrer'>" INTL_REPORT_ISSUE "</a>"
-		")</div></footer></body></html>\r\n";
+									   "<a class='b' href='/' style='display:inline;'>" INTL_BACK_TO_HOME "</a><br/><br/><br/>"
+									   "</div><footer class='footer'><div style='padding:16px'>"
+									   "<a href='https://codefor.de/stuttgart/' target='_blank' rel='noreferrer' style='color:#http://192.168.1.120/config;'>"
+									   "&copy; Open Knowledge Lab Stuttgart a.o. (Code for Germany)</a>&nbsp;&nbsp("
+									   "<a href='https://forum.sensor.community/' target='_blank' rel='noreferrer'>" INTL_FORUM "</a>"
+									   ")</div></footer></body></html>\r\n";
 
 const char WEB_ROOT_PAGE_CONTENT[] PROGMEM = "<a class='b' href='/values'>{t}</a><br/>\
 <a class='b' href='/status'>{s}</a><br/>\
