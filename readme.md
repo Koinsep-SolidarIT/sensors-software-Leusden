@@ -6,13 +6,13 @@
 
 The maintained main firmware for the Luftdaten.Info Sensor. 
 
-# Sensors
-add sensor SEN5X
+# New Sensors
+* SEN5X
 
 # Plugins
-MQTT
-Fixed IP
-Power save
+* MQTT
+* Fixed IP
+* Power save
 
 # Directories 
 
