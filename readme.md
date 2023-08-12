@@ -16,7 +16,7 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 
 # Directories 
 
-* bin   flasher and firmware bin
+* /bin   flasher (FlashESP8266) and firmware bin
 * 
 * 
 * 
@@ -24,7 +24,7 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 * 
 * 
 * 
-* bin/pcb   schematics	(to do)
+* /bin/PCB   schematics	(to do)
 
 
 
