@@ -17,14 +17,13 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 # Directories 
 
 * /bin   flasher (FlashESP8266) and firmware bin
-* /Document
-* 
-* 
-* 
-* 
+* /Doc
 * 
 * 
 * /bin/PCB   schematics	(to do)
+
+# WIFI 
+* password is airrohrcfg
 
 
 
