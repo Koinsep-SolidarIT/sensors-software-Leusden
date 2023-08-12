@@ -8,7 +8,7 @@
 * Run (on Windows) FlashESP8266
 * Select com port
 * Select blank_4MB.bin to erase
-* Select firmwarexx.bin
+* Select firmware_xx.bin
 
 # This firmware has
 
