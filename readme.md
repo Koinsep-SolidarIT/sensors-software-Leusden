@@ -17,9 +17,9 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 
 ## Directories 
 
-* /bin      flasher (FlashESP8266) and firmware bin
-* /Doc      manual/handleiding 
-* /Doc/PCB  schematic and Gerberfile
+* /bin      	flasher (FlashESP8266) and firmware bin
+* /Doc      	manual/handleiding 
+* /Doc/PCB  	schematic and Gerberfile
 
 
 ## WIFI 
