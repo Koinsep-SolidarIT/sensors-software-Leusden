@@ -8,6 +8,7 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 
 ## New Sensors
 * SEN5X
+* CO2 on SCD30
 
 ## Plugins
 * MQTT
@@ -16,11 +17,10 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 
 ## Directories 
 
-* /bin   flasher (FlashESP8266) and firmware bin
+* /bin      flasher (FlashESP8266) and firmware bin
 * /Doc
-* 
-* 
-* 
+* /Doc/PCB  schematic and Gerberfile
+
 
 ## WIFI 
 * password is airrohrcfg

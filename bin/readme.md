@@ -11,7 +11,6 @@
 * Select firmware_xx.bin
 
 # This firmware has
-
 ## New Sensors
 * SEN5X
 * CO2 on SCD30
