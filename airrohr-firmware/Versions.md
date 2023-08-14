@@ -5,6 +5,7 @@ FWL-2023-08-B1  (Fijnstof Werkgroep Leusden)
 * fixed static IP
 * changed web links
 * fix corrupted config file
+* Add UTC time on Current Data
 
 NRZ-2021-134-B3
 * Upgrade to Arduino Core 3.0.1
