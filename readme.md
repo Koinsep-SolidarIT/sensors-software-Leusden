@@ -11,7 +11,7 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 
 ## Plugins
 * MQTT
-* Fixed IP
+* Static IP
 * Power save
 
 ## Directories 
@@ -20,10 +20,13 @@ The maintained main firmware for the Luftdaten.Info Sensor.
 * /Doc
 * 
 * 
-* /bin/PCB   schematics	(to do)
+* 
 
 ## WIFI 
 * password is airrohrcfg
+
+## Wiki
+https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
 
 
 

@@ -14,11 +14,13 @@
 
 ## New Sensors
 * SEN5X
+* CO2 on SCD30
 
 ## Plugins
 * MQTT
-* Fixed IP
+* Static IP
 * Power save
+
 
 ## WIFI 
 * password is airrohrcfg
