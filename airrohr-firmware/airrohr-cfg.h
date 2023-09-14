@@ -1,12 +1,9 @@
 
-
 // This file is generated, please do not edit.
 // Change airrohr-cfg.h.py instead.
-// update MQTT juni 2023
-// add Bool Fix IP
+// update: juni 2023
 
-enum ConfigEntryType : unsigned short 
-{
+enum ConfigEntryType : unsigned short {
 	Config_Type_Bool,
 	Config_Type_UInt,
 	Config_Type_Time,
@@ -14,24 +11,22 @@ enum ConfigEntryType : unsigned short
 	Config_Type_Password
 };
 
-struct ConfigShapeEntry 
-{
+struct ConfigShapeEntry {
 	enum ConfigEntryType cfg_type;
 	unsigned short cfg_len;
 	const char* _cfg_key;
-
+          
 	union {
 		void* as_void;
 		bool* as_bool;
 		unsigned int* as_uint;
 		char* as_str;
 	} cfg_val;
-
+          
 	const __FlashStringHelper* cfg_key() const { return FPSTR(_cfg_key); }
 };
 
-enum ConfigShapeId 
-{
+enum ConfigShapeId {
 	Config_current_lang,
 	Config_wlanssid,
 	Config_wlanpwd,
@@ -57,8 +52,8 @@ enum ConfigShapeId
 	Config_scd30_read,
 	Config_ds18b20_read,
 	Config_dnms_read,
-	Config_dnms_correction,						// 25
-	Config_temp_correction,						// 26
+	Config_dnms_correction,
+	Config_temp_correction,
 	Config_height_above_sealevel,
 	Config_gps_read,
 	Config_send2dusti,
@@ -111,8 +106,8 @@ enum ConfigShapeId
 	Config_measurement_name_influx,
 	Config_ssl_influx,
 	Config_has_fix_ip,
-	Config_scd30_co2_correction,						// 73
-	Config_scd30_temp_correction,						// 74
+	Config_scd30_co2_correction,
+	Config_scd30_temp_correction,
 };
 
 static constexpr char CFG_KEY_CURRENT_LANG[] PROGMEM = "current_lang";
@@ -185,25 +180,19 @@ static constexpr char CFG_KEY_URL_INFLUX[] PROGMEM = "url_influx";
 static constexpr char CFG_KEY_PORT_INFLUX[] PROGMEM = "port_influx";
 static constexpr char CFG_KEY_USER_INFLUX[] PROGMEM = "user_influx";
 static constexpr char CFG_KEY_PWD_INFLUX[] PROGMEM = "pwd_influx";
-
-// MQTT
 static constexpr char CFG_KEY_SEND2MQTT[] PROGMEM = "send2mqtt";
 static constexpr char CFG_KEY_MQTT_SERVER[] PROGMEM = "mqtt_server";
 static constexpr char CFG_KEY_MQTT_TOPIC[] PROGMEM = "mqtt_topic";
 static constexpr char CFG_KEY_MQTT_PORT[] PROGMEM = "mqtt_port";
 static constexpr char CFG_KEY_MQTT_USER[] PROGMEM = "mqtt_user";
 static constexpr char CFG_KEY_MQTT_PWD[] PROGMEM = "mqtt_pwd";
-//
 static constexpr char CFG_KEY_MEASUREMENT_NAME_INFLUX[] PROGMEM = "measurement_name_influx";
 static constexpr char CFG_KEY_SSL_INFLUX[] PROGMEM = "ssl_influx";
 static constexpr char CFG_KEY_HAS_FIX_IP[] PROGMEM = "has_fix_ip";
-
 static constexpr char CFG_KEY_SCD30_CO2_CORRECTION[] PROGMEM = "scd30_co2_correction";
 static constexpr char CFG_KEY_SCD30_TEMP_CORRECTION[] PROGMEM = "scd30_temp_correction";
 
-
-static constexpr ConfigShapeEntry configShape[] PROGMEM = 
-{
+static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_String, sizeof(cfg::current_lang)-1, CFG_KEY_CURRENT_LANG, cfg::current_lang },
 	{ Config_Type_String, sizeof(cfg::wlanssid)-1, CFG_KEY_WLANSSID, cfg::wlanssid },
 	{ Config_Type_Password, sizeof(cfg::wlanpwd)-1, CFG_KEY_WLANPWD, cfg::wlanpwd },
@@ -229,8 +218,8 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM =
 	{ Config_Type_Bool, 0, CFG_KEY_SCD30_READ, &cfg::scd30_read },
 	{ Config_Type_Bool, 0, CFG_KEY_DS18B20_READ, &cfg::ds18b20_read },
 	{ Config_Type_Bool, 0, CFG_KEY_DNMS_READ, &cfg::dnms_read },
-	{ Config_Type_String, sizeof(cfg::dnms_correction)-1, CFG_KEY_DNMS_CORRECTION, cfg::dnms_correction },					// 25
-	{ Config_Type_String, sizeof(cfg::temp_correction)-1, CFG_KEY_TEMP_CORRECTION, cfg::temp_correction },					// 26
+	{ Config_Type_String, sizeof(cfg::dnms_correction)-1, CFG_KEY_DNMS_CORRECTION, cfg::dnms_correction },
+	{ Config_Type_String, sizeof(cfg::temp_correction)-1, CFG_KEY_TEMP_CORRECTION, cfg::temp_correction },
 	{ Config_Type_String, sizeof(cfg::height_above_sealevel)-1, CFG_KEY_HEIGHT_ABOVE_SEALEVEL, cfg::height_above_sealevel },
 	{ Config_Type_Bool, 0, CFG_KEY_GPS_READ, &cfg::gps_read },
 	{ Config_Type_Bool, 0, CFG_KEY_SEND2DUSTI, &cfg::send2dusti },
@@ -274,20 +263,15 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM =
 	{ Config_Type_UInt, 0, CFG_KEY_PORT_INFLUX, &cfg::port_influx },
 	{ Config_Type_String, sizeof(cfg::user_influx)-1, CFG_KEY_USER_INFLUX, cfg::user_influx },
 	{ Config_Type_Password, sizeof(cfg::pwd_influx)-1, CFG_KEY_PWD_INFLUX, cfg::pwd_influx },
-
 	{ Config_Type_Bool, 0, CFG_KEY_SEND2MQTT, &cfg::send2mqtt },
 	{ Config_Type_String, sizeof(cfg::mqtt_server)-1, CFG_KEY_MQTT_SERVER, cfg::mqtt_server },
 	{ Config_Type_String, sizeof(cfg::mqtt_topic)-1, CFG_KEY_MQTT_TOPIC, cfg::mqtt_topic },
 	{ Config_Type_UInt, 0, CFG_KEY_MQTT_PORT, &cfg::mqtt_port },
 	{ Config_Type_String, sizeof(cfg::mqtt_user)-1, CFG_KEY_MQTT_USER, cfg::mqtt_user },
 	{ Config_Type_Password, sizeof(cfg::mqtt_pwd)-1, CFG_KEY_MQTT_PWD, cfg::mqtt_pwd },
-	
 	{ Config_Type_String, sizeof(cfg::measurement_name_influx)-1, CFG_KEY_MEASUREMENT_NAME_INFLUX, cfg::measurement_name_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_SSL_INFLUX, &cfg::ssl_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_HAS_FIX_IP, &cfg::has_fix_ip },
-
-	{ Config_Type_String, sizeof(cfg::scd30_co2_correction)-1, CFG_KEY_SCD30_CO2_CORRECTION, cfg::scd30_co2_correction },					// 25
-	{ Config_Type_String, sizeof(cfg::scd30_temp_correction)-1, CFG_KEY_SCD30_TEMP_CORRECTION, cfg::scd30_temp_correction },					// 26
-
-	// TODO: MQTT gwt and set variable data.
+	{ Config_Type_String, sizeof(cfg::scd30_co2_correction)-1, CFG_KEY_SCD30_CO2_CORRECTION, cfg::scd30_co2_correction },
+	{ Config_Type_String, sizeof(cfg::scd30_temp_correction)-1, CFG_KEY_SCD30_TEMP_CORRECTION, cfg::scd30_temp_correction },
 };

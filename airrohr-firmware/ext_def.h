@@ -34,12 +34,12 @@ const char WWW_PASSWORD[] PROGMEM = "";
 
 enum LoggerEntry 
 {
-    LoggerSensorCommunity,
-    LoggerMadavi,
-    LoggerSensemap,
+    LoggerSensorCommunity,      // application/json
+    LoggerMadavi,               // application/json
+    LoggerSensemap,             // application/json
     LoggerFSapp,
-    Loggeraircms,
-    LoggerInflux,
+    Loggeraircms,               // plain text
+    LoggerInflux,               // Influx
     LoggerCustom,
     LoggerCount
 };
@@ -361,8 +361,4 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 #define DISPLAY_DEVICE_INFO 1
 
 // Set debug level for serial output?
-<<<<<<< HEAD
-#define DEBUG 3
-=======
 #define DEBUG 1
->>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885
