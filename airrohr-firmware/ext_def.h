@@ -1,6 +1,6 @@
 // Language config
 #define CURRENT_LANG INTL_LANG
-
+                                             
 // Wifi config
 const char WLANSSID[] PROGMEM = "Freifunk-disabled";
 const char WLANPWD[] PROGMEM = "";
@@ -15,12 +15,12 @@ const char WWW_PASSWORD[] PROGMEM = "";
 #define FS_PWD "airrohrcfg"
 
 // Where to send the data?
-#define SEND2SENSORCOMMUNITY 0
+#define SEND2SENSORCOMMUNITY 1
 #define SSL_SENSORCOMMUNITY 0
-#define SEND2MADAVI 0
+#define SEND2MADAVI 1
 #define SSL_MADAVI 0
 #define SEND2SENSEMAP 0
-#define SEND2FSAPP 0
+#define SEND2FSAPP 1
 #define SSL_FSAPP 0
 #define SEND2AIRCMS 0
 #define SEND2MQTT 0
@@ -361,4 +361,8 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 #define DISPLAY_DEVICE_INFO 1
 
 // Set debug level for serial output?
+<<<<<<< HEAD
 #define DEBUG 3
+=======
+#define DEBUG 1
+>>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885

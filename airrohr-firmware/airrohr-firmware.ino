@@ -54,6 +54,9 @@
  * Tasmota-sensors:(https://github.com/arendst/Tasmota/releases) 13 	*
  * firmware flashed														*
  * 																		*
+ * 																		*
+ * 2023-08-12															*
+ * Add MQTT	RD/FvD														*
  ************************************************************************
  *
  * latest build using lib 3.1.0
@@ -73,7 +76,7 @@
 #include <pgmspace.h>
 
 // increment on change
-#define SOFTWARE_VERSION_STR "NRZ-2023-138-B6"
+#define SOFTWARE_VERSION_STR "FWL-2023-08-B1"
 String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 
 /*****************************************************************

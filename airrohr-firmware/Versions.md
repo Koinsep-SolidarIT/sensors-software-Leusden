@@ -1,3 +1,15 @@
+<<<<<<< HEAD
+=======
+FWL-2023-08-B1  (Fijnstof Werkgroep Leusden)
+* SEN5X sensor
+* MQTT
+* add CO2 on SCD30
+* fixed static IP
+* changed web links
+* fix corrupted config file
+* Add UTC time on Current Data
+
+>>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885
 NRZ-2021-134-B3
 * Upgrade to Arduino Core 3.0.1
 * Libraries updated

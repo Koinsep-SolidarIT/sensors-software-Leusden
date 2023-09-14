@@ -6,6 +6,7 @@
 
 The maintained main firmware for the Luftdaten.Info Sensor. 
 
+<<<<<<< HEAD
 ## airrohr-update-loader
 
 A transitional firmware which will look for a firmware file
@@ -31,3 +32,32 @@ for firmwares larger than 512k (up to ~ 740k).
 # Development
 
 The development is done in the beta branch.
+=======
+## New Sensors
+* SEN5X
+* CO2 on SCD30
+
+## Plugins
+* MQTT
+* Static IP
+* Power save
+
+## Directories 
+
+* /bin      - flasher (FlashESP8266) and firmware bin
+* /Doc      - manual/handleiding 
+* /Doc/PCB  	- schematic and Gerberfile
+
+
+## WIFI 
+* password is airrohrcfg
+
+## Wiki
+https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
+
+## Handleidingen NL
+https://www.cmlleusden.nl/handleidingen-fijnstofmeter.html
+
+
+
+>>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885
