@@ -66,6 +66,15 @@ const char INTL_STATIC_SUBNET[] PROGMEM = "Subnet";
 const char INTL_STATIC_GATEWAY[] PROGMEM = "Gateway";
 const char INTL_STATIC_DNS[] PROGMEM = "DNS Server";
 
+// MQTT
+const char INTL_SEND_TO_MQTT[] PROGMEM = "Senden an MQTT";
+const char INTL_TOPIC[] PROGMEM = "Topic";
+const char INTL_ONLINE[] PROGMEM = "Online";
+const char INTL_OFFLINE[] PROGMEM = "Offline";
+const char INTL_MQTT_STAT[] PROGMEM = "Status";
+
+const char INTL_SCD30_CO2_CORRECTION[] PROGMEM = "Korrekturwert in CO₂";
+
 const char INTL_DEBUG_LEVEL[] PROGMEM = "Debug&nbsp;Level";
 const char INTL_MEASUREMENT_INTERVAL[] PROGMEM = "Messintervall";
 const char INTL_DURATION_ROUTER_MODE[] PROGMEM = "Dauer&nbsp;Routermodus";
