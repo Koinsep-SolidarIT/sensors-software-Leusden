@@ -40,11 +40,7 @@ const char INTL_DS18B20[] PROGMEM = "DS18B20 ({t})";
 const char INTL_DNMS[] PROGMEM = "DNMS ({l_a})";
 const char INTL_DNMS_CORRECTION[] PROGMEM = "correction in dB(A)";
 const char INTL_TEMP_CORRECTION[] PROGMEM = "Correction in °C";
-<<<<<<< HEAD
-const char INTL_SCD30_CO2_CORRECTION[] PROGMEM = "correction in CO₂";
-=======
 const char INTL_SCD30_CO2_CORRECTION[] PROGMEM = "Correction in CO₂";
->>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885
 const char INTL_HEIGHT_ABOVE_SEALEVEL[] PROGMEM = "Above sea level (m)";
 const char INTL_PRESSURE_AT_SEALEVEL[] PROGMEM = "pressure at sea level";
 const char INTL_NEO6M[] PROGMEM = "GPS (NEO 6M)";
