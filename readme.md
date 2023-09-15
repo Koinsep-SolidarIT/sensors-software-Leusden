@@ -1,12 +1,10 @@
 
-
 # Software for Sensor.Community / Luftdaten.Info Sensor
 
 ## airrohr-firmware
 
 The maintained main firmware for the Luftdaten.Info Sensor. 
 
-<<<<<<< HEAD
 ## airrohr-update-loader
 
 A transitional firmware which will look for a firmware file
@@ -58,6 +56,3 @@ https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
 ## Handleidingen NL
 https://www.cmlleusden.nl/handleidingen-fijnstofmeter.html
 
-
-
->>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885
