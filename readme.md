@@ -17,25 +17,27 @@ for firmwares larger than 512k (up to ~ 740k).
 
 # Directories 
 
-* BeginnersGuide	Beginners guide to ESP programming with Arduino code
-* airrohr-....          currently used versions (2017-05-23+)
-* airrohr-update-...	currently used for OTA (2019-08-30+)
-* apiclients	clients for the dusti API and other APIs
-* arduino	native arduino code
-* esp8266-lua	nodemcu firmware code, lua scripts (not maintained after change to arduino)
-* esp8266-arduino	programming esp8266 with arduino code/IDE
-* r-scripts	sensor data analysis with R
-* schematics	frizzing schematics (not updated, 2016-03-01)
+* BeginnersGuide	  Beginners guide to ESP programming with Arduino code
+* airrohr-....        currently used versions (2017-05-23+)
+* airrohr-update-...  currently used for OTA (2019-08-30+)
+* apiclients	      clients for the dusti API and other APIs
+* arduino	          native arduino code
+* esp8266-lua	      nodemcu firmware code, lua scripts (not maintained after change to arduino)
+* esp8266-arduino	  programming esp8266 with arduino code/IDE
+* r-scripts	          sensor data analysis with R
+* schematics	      frizzing schematics (not updated, 2016-03-01)
 
 # Development
 
 The development is done in the beta branch.
-=======
+
 ## New Sensors
-* SEN5X
+
+* SEN5XX
 * CO2 on SCD30
 
 ## Plugins
+
 * MQTT
 * Static IP
 * Power save
@@ -44,18 +46,18 @@ The development is done in the beta branch.
 
 * /bin      - flasher (FlashESP8266) and firmware bin
 * /Doc      - manual/handleiding 
-* /Doc/PCB  	- schematic and Gerberfile
+* /Doc/PCB 	- schematic and Gerberfile
 
 
 ## WIFI 
-* password is airrohrcfg
+
+* password is 'airrohrcfg'
 
 ## Wiki
+
 https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
 
 ## Handleidingen NL
+
 https://www.cmlleusden.nl/handleidingen-fijnstofmeter.html
 
-
-
->>>>>>> 12903ab3cb7f9cfe6d6e83559c7e4ed091708885
