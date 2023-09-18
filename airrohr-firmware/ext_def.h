@@ -360,5 +360,6 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 // Show device info on displays
 #define DISPLAY_DEVICE_INFO 1
 
-// Set debug level for serial output?
-#define DEBUG 1
+// Set default debug level for serial output?
+// don't change.
+#define DEBUG 3

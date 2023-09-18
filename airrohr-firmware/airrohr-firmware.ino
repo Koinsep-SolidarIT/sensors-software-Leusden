@@ -76,7 +76,7 @@
 #include <pgmspace.h>
 
 // increment on change
-#define SOFTWARE_VERSION_STR "FWL-2023-08-B1"
+#define SOFTWARE_VERSION_STR "FWL-2023-09-13"
 String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 
 /*****************************************************************
