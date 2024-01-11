@@ -1,3 +1,4 @@
+
 // Language config
 #define CURRENT_LANG INTL_LANG
                                              
@@ -9,6 +10,7 @@ const char WLANPWD[] PROGMEM = "";
 const char WWW_USERNAME[] PROGMEM = "admin";
 const char WWW_PASSWORD[] PROGMEM = "";
 #define WWW_BASICAUTH_ENABLED 0
+#define HAS_MOREWIFI 0
 
 // Sensor Wifi config (config mode)
 #define FS_SSID ""
@@ -34,12 +36,12 @@ const char WWW_PASSWORD[] PROGMEM = "";
 
 enum LoggerEntry 
 {
-    LoggerSensorCommunity,      // application/json
-    LoggerMadavi,               // application/json
-    LoggerSensemap,             // application/json
+    LoggerSensorCommunity,
+    LoggerMadavi,
+    LoggerSensemap,
     LoggerFSapp,
-    Loggeraircms,               // plain text
-    LoggerInflux,               // Influx
+    Loggeraircms,
+    LoggerInflux,
     LoggerCustom,
     LoggerCount
 };
@@ -85,11 +87,11 @@ static const char URL_AIRCMS[] PROGMEM = "/php/sensors.php?h=";
 #define PORT_AIRCMS 80
 
 static const char FW_DOWNLOAD_HOST[] PROGMEM = "firmware.sensor.community";
-#define FW_DOWNLOAD_PORT 443
+#define FW_DOWNLOAD_PORT 443                    // 443 is for HTTPS
 
 static const char FW_2ND_LOADER_URL[] PROGMEM = OTA_BASENAME "/loader-002.bin";
 
-static const char NTP_SERVER_1[] PROGMEM = "0.pool.ntp.org";
+static const char NTP_SERVER_1[] PROGMEM = "0.pool.ntp.org";    // NTP servers operate always in UTC time.
 static const char NTP_SERVER_2[] PROGMEM = "1.pool.ntp.org";
 
 // define own API
@@ -109,6 +111,10 @@ static const char URL_INFLUX[] PROGMEM = "/write?db=sensorcommunity";
 static const char MEASUREMENT_NAME_INFLUX[] PROGMEM = "feinstaub";
 #define SSL_INFLUX 0
 #define HAS_FIX_IP 0
+
+// Simm7000
+#define HAS_S7000 0
+#define HAS_GPS 0           // GPS enable
 
 // define MQTT Definitionen
 static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
@@ -141,6 +147,12 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 // define serial interface pins for GPS modules
 #define GPS_SERIAL_RX D5
 #define GPS_SERIAL_TX D6
+
+// define serial interface pins for SIM7000 LTE module
+#define SIM_PIN_RX  12              // Serial RX pin no: D6 -> GPIO12  <---- TX SIM7000
+#define SIM_PIN_TX  14              // Serial TX pin no: D5 -> GPIO14  ----> RX SIM7000
+#define SIM_PIN_PWR 13              // PowerPin no:      D7 -> GPIO13  ----> SIM7000 PWRPIN
+// #define PIN_DTR 25   xx
 
 // define serial interface pins for Next PM Sensor
 #define NPM_SERIAL_RX D1
@@ -257,7 +269,7 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 #define PPD_API_PIN 5
 
 // SDS011, the more expensive version of the particle sensor
-#define SDS_READ 1              // Particle sensor, default: true  
+#define SDS_READ 0              // Particle sensor, default: true  
 #define SDS_API_PIN 1
 
 // PMS1003, PMS300, 3PMS5003, PMS6003, PMS7003
@@ -279,16 +291,16 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 
 // Sensirion Sensirion I2C SEN5X
 #define SEN5X_READ 0                          // default: false
-#define SEN5X_API_PIN 1                       // (16) New pin nr: 1 for PM and temp, humidity, NOx.
-#define SEN5X_TH_API_PIN 17                   // (18)
-#define SEN5X_WAITING_AFTER_LAST_READ 11000   // waiting time after last reading mesurement data in ms
-#define SEN5X_AUTO_CLEANING_INTERVAL 7200     // time in seconds
+#define SEN5X_PM_API_PIN 1                    // (16) New pin nr: 1 for PM and temp, humidity, NOx.
+#define SEN5X_SCD30_TH_API_PIN 17             // Pin 17 for SCD30
+#define SEN5X_SHT35_TH_API_PIN 7              // Pin 7 for SHT35
+#define SEN5X_ON 0
+#define SEN5X_SYM_TH "SHT35"                  // temp, hum
+#define SEN5X_SYM_PM "SPS30"                  // PM0.5, PM1, PM2.5, PM4, PM10
 
 // Sensirion SPS30, the more expensive version of the particle sensor
 #define SPS30_READ 0
 #define SPS30_API_PIN 1
-#define SPS30_WAITING_AFTER_LAST_READ 11000   // waiting time after last reading mesurement data in ms
-#define SPS30_AUTO_CLEANING_INTERVAL 7200     // time in seconds
 
 // BMP180, temperature, pressure
 #define BMP_READ 0
@@ -360,6 +372,14 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 // Show device info on displays
 #define DISPLAY_DEVICE_INFO 1
 
-// Set default debug level for serial output?
-// don't change.
-#define DEBUG 3
+// RCWL-0516 sensor => Radar Motion.
+static const char HOST_RADAR[] PROGMEM = "192.168.10.13";
+#define PORT_RADAR 21                                           // 443
+#define HAS_RADARMOTION 0
+#define USER_RADAR "ftp"
+#define PWD_RADAR "secret"
+
+// Set debug level for serial output?
+// Default DEBUG level, DON'T change.
+#define DEBUG 6
+

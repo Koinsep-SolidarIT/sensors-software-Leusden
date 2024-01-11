@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
 configshape_in = """
+
 String		current_lang
 String		wlanssid
 Password	wlanpwd
+String		wlanssid_2
+Password	wlanpwd_2
+String		wlanssid_3
+Password	wlanpwd_3
 String		www_username
 Password	www_password
 String		fs_ssid
@@ -19,6 +24,9 @@ Bool		npm_read
 Bool        npm_fulltime
 Bool		ips_read
 Bool		sen5x_read
+Bool		sen5x_on
+String		sen5x_sym_pm
+String		sen5x_sym_th
 Bool		sps30_read
 Bool		bmp_read
 Bool		bmx280_read
@@ -73,23 +81,38 @@ String		user_influx
 Password	pwd_influx
 Bool		send2mqtt
 String		mqtt_server
-String		mqtt_topic
 UInt		mqtt_port
 String		mqtt_user
 Password	mqtt_pwd
+String		mqtt_topic
 String		measurement_name_influx
 Bool		ssl_influx
 Bool		has_fix_ip
-
 String		scd30_co2_correction
 String		scd30_temp_correction
+Bool        has_s7000
+String		host_radar
+UInt		port_radar
+UInt		motion_wait_time
+String		user_radar
+Password	pwd_radar
+Bool        has_radarmotion
+Bool        has_morewifi
+
 """
 
 with open("airrohr-cfg.h", "w") as h:
     print("""
+
 // This file is generated, please do not edit.
 // Change airrohr-cfg.h.py instead.
-// update: juni 2023
+// update: 29 juli 2023
+// add Bool Fix IP
+// update: 28 December 2023
+// add more settings
+//
+// run python airrohr-cfg.h.py
+//
 
 enum ConfigEntryType : unsigned short {
 	Config_Type_Bool,

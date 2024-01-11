@@ -1,7 +1,14 @@
 
+
 // This file is generated, please do not edit.
 // Change airrohr-cfg.h.py instead.
-// update: juni 2023
+// update: 29 juli 2023
+// add Bool Fix IP
+// update: 28 December 2023
+// add more settings
+//
+// run python airrohr-cfg.h.py
+//
 
 enum ConfigEntryType : unsigned short {
 	Config_Type_Bool,
@@ -30,6 +37,10 @@ enum ConfigShapeId {
 	Config_current_lang,
 	Config_wlanssid,
 	Config_wlanpwd,
+	Config_wlanssid_2,
+	Config_wlanpwd_2,
+	Config_wlanssid_3,
+	Config_wlanpwd_3,
 	Config_www_username,
 	Config_www_password,
 	Config_fs_ssid,
@@ -45,6 +56,9 @@ enum ConfigShapeId {
 	Config_npm_fulltime,
 	Config_ips_read,
 	Config_sen5x_read,
+	Config_sen5x_on,
+	Config_sen5x_sym_pm,
+	Config_sen5x_sym_th,
 	Config_sps30_read,
 	Config_bmp_read,
 	Config_bmx280_read,
@@ -99,20 +113,32 @@ enum ConfigShapeId {
 	Config_pwd_influx,
 	Config_send2mqtt,
 	Config_mqtt_server,
-	Config_mqtt_topic,
 	Config_mqtt_port,
 	Config_mqtt_user,
 	Config_mqtt_pwd,
+	Config_mqtt_topic,
 	Config_measurement_name_influx,
 	Config_ssl_influx,
 	Config_has_fix_ip,
 	Config_scd30_co2_correction,
 	Config_scd30_temp_correction,
+	Config_has_s7000,
+	Config_host_radar,
+	Config_port_radar,
+	Config_motion_wait_time,
+	Config_user_radar,
+	Config_pwd_radar,
+	Config_has_radarmotion,
+	Config_has_morewifi,
 };
 
 static constexpr char CFG_KEY_CURRENT_LANG[] PROGMEM = "current_lang";
 static constexpr char CFG_KEY_WLANSSID[] PROGMEM = "wlanssid";
 static constexpr char CFG_KEY_WLANPWD[] PROGMEM = "wlanpwd";
+static constexpr char CFG_KEY_WLANSSID_2[] PROGMEM = "wlanssid_2";
+static constexpr char CFG_KEY_WLANPWD_2[] PROGMEM = "wlanpwd_2";
+static constexpr char CFG_KEY_WLANSSID_3[] PROGMEM = "wlanssid_3";
+static constexpr char CFG_KEY_WLANPWD_3[] PROGMEM = "wlanpwd_3";
 static constexpr char CFG_KEY_WWW_USERNAME[] PROGMEM = "www_username";
 static constexpr char CFG_KEY_WWW_PASSWORD[] PROGMEM = "www_password";
 static constexpr char CFG_KEY_FS_SSID[] PROGMEM = "fs_ssid";
@@ -128,6 +154,9 @@ static constexpr char CFG_KEY_NPM_READ[] PROGMEM = "npm_read";
 static constexpr char CFG_KEY_NPM_FULLTIME[] PROGMEM = "npm_fulltime";
 static constexpr char CFG_KEY_IPS_READ[] PROGMEM = "ips_read";
 static constexpr char CFG_KEY_SEN5X_READ[] PROGMEM = "sen5x_read";
+static constexpr char CFG_KEY_SEN5X_ON[] PROGMEM = "sen5x_on";
+static constexpr char CFG_KEY_SEN5X_SYM_PM[] PROGMEM = "sen5x_sym_pm";
+static constexpr char CFG_KEY_SEN5X_SYM_TH[] PROGMEM = "sen5x_sym_th";
 static constexpr char CFG_KEY_SPS30_READ[] PROGMEM = "sps30_read";
 static constexpr char CFG_KEY_BMP_READ[] PROGMEM = "bmp_read";
 static constexpr char CFG_KEY_BMX280_READ[] PROGMEM = "bmx280_read";
@@ -182,20 +211,32 @@ static constexpr char CFG_KEY_USER_INFLUX[] PROGMEM = "user_influx";
 static constexpr char CFG_KEY_PWD_INFLUX[] PROGMEM = "pwd_influx";
 static constexpr char CFG_KEY_SEND2MQTT[] PROGMEM = "send2mqtt";
 static constexpr char CFG_KEY_MQTT_SERVER[] PROGMEM = "mqtt_server";
-static constexpr char CFG_KEY_MQTT_TOPIC[] PROGMEM = "mqtt_topic";
 static constexpr char CFG_KEY_MQTT_PORT[] PROGMEM = "mqtt_port";
 static constexpr char CFG_KEY_MQTT_USER[] PROGMEM = "mqtt_user";
 static constexpr char CFG_KEY_MQTT_PWD[] PROGMEM = "mqtt_pwd";
+static constexpr char CFG_KEY_MQTT_TOPIC[] PROGMEM = "mqtt_topic";
 static constexpr char CFG_KEY_MEASUREMENT_NAME_INFLUX[] PROGMEM = "measurement_name_influx";
 static constexpr char CFG_KEY_SSL_INFLUX[] PROGMEM = "ssl_influx";
 static constexpr char CFG_KEY_HAS_FIX_IP[] PROGMEM = "has_fix_ip";
 static constexpr char CFG_KEY_SCD30_CO2_CORRECTION[] PROGMEM = "scd30_co2_correction";
 static constexpr char CFG_KEY_SCD30_TEMP_CORRECTION[] PROGMEM = "scd30_temp_correction";
+static constexpr char CFG_KEY_HAS_S7000[] PROGMEM = "has_s7000";
+static constexpr char CFG_KEY_HOST_RADAR[] PROGMEM = "host_radar";
+static constexpr char CFG_KEY_PORT_RADAR[] PROGMEM = "port_radar";
+static constexpr char CFG_KEY_MOTION_WAIT_TIME[] PROGMEM = "motion_wait_time";
+static constexpr char CFG_KEY_USER_RADAR[] PROGMEM = "user_radar";
+static constexpr char CFG_KEY_PWD_RADAR[] PROGMEM = "pwd_radar";
+static constexpr char CFG_KEY_HAS_RADARMOTION[] PROGMEM = "has_radarmotion";
+static constexpr char CFG_KEY_HAS_MOREWIFI[] PROGMEM = "has_morewifi";
 
 static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_String, sizeof(cfg::current_lang)-1, CFG_KEY_CURRENT_LANG, cfg::current_lang },
 	{ Config_Type_String, sizeof(cfg::wlanssid)-1, CFG_KEY_WLANSSID, cfg::wlanssid },
 	{ Config_Type_Password, sizeof(cfg::wlanpwd)-1, CFG_KEY_WLANPWD, cfg::wlanpwd },
+	{ Config_Type_String, sizeof(cfg::wlanssid_2)-1, CFG_KEY_WLANSSID_2, cfg::wlanssid_2 },
+	{ Config_Type_Password, sizeof(cfg::wlanpwd_2)-1, CFG_KEY_WLANPWD_2, cfg::wlanpwd_2 },
+	{ Config_Type_String, sizeof(cfg::wlanssid_3)-1, CFG_KEY_WLANSSID_3, cfg::wlanssid_3 },
+	{ Config_Type_Password, sizeof(cfg::wlanpwd_3)-1, CFG_KEY_WLANPWD_3, cfg::wlanpwd_3 },
 	{ Config_Type_String, sizeof(cfg::www_username)-1, CFG_KEY_WWW_USERNAME, cfg::www_username },
 	{ Config_Type_Password, sizeof(cfg::www_password)-1, CFG_KEY_WWW_PASSWORD, cfg::www_password },
 	{ Config_Type_String, sizeof(cfg::fs_ssid)-1, CFG_KEY_FS_SSID, cfg::fs_ssid },
@@ -211,6 +252,9 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_Bool, 0, CFG_KEY_NPM_FULLTIME, &cfg::npm_fulltime },
 	{ Config_Type_Bool, 0, CFG_KEY_IPS_READ, &cfg::ips_read },
 	{ Config_Type_Bool, 0, CFG_KEY_SEN5X_READ, &cfg::sen5x_read },
+	{ Config_Type_Bool, 0, CFG_KEY_SEN5X_ON, &cfg::sen5x_on },
+	{ Config_Type_String, sizeof(cfg::sen5x_sym_pm)-1, CFG_KEY_SEN5X_SYM_PM, cfg::sen5x_sym_pm },
+	{ Config_Type_String, sizeof(cfg::sen5x_sym_th)-1, CFG_KEY_SEN5X_SYM_TH, cfg::sen5x_sym_th },
 	{ Config_Type_Bool, 0, CFG_KEY_SPS30_READ, &cfg::sps30_read },
 	{ Config_Type_Bool, 0, CFG_KEY_BMP_READ, &cfg::bmp_read },
 	{ Config_Type_Bool, 0, CFG_KEY_BMX280_READ, &cfg::bmx280_read },
@@ -265,13 +309,21 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_Password, sizeof(cfg::pwd_influx)-1, CFG_KEY_PWD_INFLUX, cfg::pwd_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_SEND2MQTT, &cfg::send2mqtt },
 	{ Config_Type_String, sizeof(cfg::mqtt_server)-1, CFG_KEY_MQTT_SERVER, cfg::mqtt_server },
-	{ Config_Type_String, sizeof(cfg::mqtt_topic)-1, CFG_KEY_MQTT_TOPIC, cfg::mqtt_topic },
 	{ Config_Type_UInt, 0, CFG_KEY_MQTT_PORT, &cfg::mqtt_port },
 	{ Config_Type_String, sizeof(cfg::mqtt_user)-1, CFG_KEY_MQTT_USER, cfg::mqtt_user },
 	{ Config_Type_Password, sizeof(cfg::mqtt_pwd)-1, CFG_KEY_MQTT_PWD, cfg::mqtt_pwd },
+	{ Config_Type_String, sizeof(cfg::mqtt_topic)-1, CFG_KEY_MQTT_TOPIC, cfg::mqtt_topic },
 	{ Config_Type_String, sizeof(cfg::measurement_name_influx)-1, CFG_KEY_MEASUREMENT_NAME_INFLUX, cfg::measurement_name_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_SSL_INFLUX, &cfg::ssl_influx },
 	{ Config_Type_Bool, 0, CFG_KEY_HAS_FIX_IP, &cfg::has_fix_ip },
 	{ Config_Type_String, sizeof(cfg::scd30_co2_correction)-1, CFG_KEY_SCD30_CO2_CORRECTION, cfg::scd30_co2_correction },
 	{ Config_Type_String, sizeof(cfg::scd30_temp_correction)-1, CFG_KEY_SCD30_TEMP_CORRECTION, cfg::scd30_temp_correction },
+	{ Config_Type_Bool, 0, CFG_KEY_HAS_S7000, &cfg::has_s7000 },
+	{ Config_Type_String, sizeof(cfg::host_radar)-1, CFG_KEY_HOST_RADAR, cfg::host_radar },
+	{ Config_Type_UInt, 0, CFG_KEY_PORT_RADAR, &cfg::port_radar },
+	{ Config_Type_UInt, 0, CFG_KEY_MOTION_WAIT_TIME, &cfg::motion_wait_time },
+	{ Config_Type_String, sizeof(cfg::user_radar)-1, CFG_KEY_USER_RADAR, cfg::user_radar },
+	{ Config_Type_Password, sizeof(cfg::pwd_radar)-1, CFG_KEY_PWD_RADAR, cfg::pwd_radar },
+	{ Config_Type_Bool, 0, CFG_KEY_HAS_RADARMOTION, &cfg::has_radarmotion },
+	{ Config_Type_Bool, 0, CFG_KEY_HAS_MOREWIFI, &cfg::has_morewifi },
 };

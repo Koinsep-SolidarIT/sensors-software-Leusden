@@ -40,7 +40,7 @@ const char SENSORS_SPS30[] PROGMEM = "Sensirion SPS30";
 const char SENSORS_SEN50[] PROGMEM = "Sensirion SEN50";
 const char SENSORS_SEN54[] PROGMEM = "Sensirion SEN54";
 const char SENSORS_SEN55[] PROGMEM = "Sensirion SEN55";
-const char SENSORS_SEN5X_HT[] PROGMEM = "Sensirion SEN5X HT";
+const char SENSORS_SEN5X_TH[] PROGMEM = "Sensirion SEN5X TH";
 const char SENSORS_DHT22[] PROGMEM = "DHT22";
 const char SENSORS_DS18B20[] PROGMEM = "DS18B20";
 const char SENSORS_HTU21D[] PROGMEM = "HTU21D";
@@ -76,7 +76,11 @@ input[type=submit]:hover{background:#167908}\
 .radio{display:none}.panel{display:none}\
 .canvas{min-height:118px;background:#055d52;margin-bottom:20px;}\
 #r4:checked~.panels>#panel4,#r1:checked~.panels>#panel1,#r3:checked~.panels>#panel3,#r2:checked~.panels>#panel2{display:block}\
-#r4:checked~.tabs>#tab4,#r1:checked~.tabs>#tab1,#r3:checked~.tabs>#tab3,#r2:checked~.tabs>#tab2{background:#055d52;color:#fff}";
+#r4:checked~.tabs>#tab4,#r1:checked~.tabs>#tab1,#r3:checked~.tabs>#tab3,#r2:checked~.tabs>#tab2{background:#055d52;color:#fff}\
+#sen5x_sym_pm{background:#055d52;color:#fff}\
+#sen5x_sym_th{background:#055d52;color:#fff}\
+#s7000_mode{background:#055d52;color:#fff}\
+input[type=checkbox]{accent-color: rgb(255, 255, 128);}";
 
 #define STATIC_PREFIX "/" INTL_LANG "_s1"
 
@@ -107,13 +111,24 @@ const char WEB_PAGE_FOOTER[] PROGMEM = "<br/><br/>"
 									   "<a href='https://forum.sensor.community/' target='_blank' rel='noreferrer'>" INTL_FORUM "</a>"
 									   ")</div></footer></body></html>\r\n";
 
+
+
 const char WEB_ROOT_PAGE_CONTENT[] PROGMEM = "<a class='b' href='/values'>{t}</a><br/>\
-<a class='b' href='/status'>{s}</a><br/>\
-<a class='b' href='https://maps.sensor.community/' target='_blank' rel='noreferrer'>" INTL_ACTIVE_SENSORS_MAP "</a><br/>\
-<a class='b' href='/config'>{conf}</a><br/>\
-<a class='b' href='/removeConfig'>" INTL_CONFIGURATION_DELETE "</a><br/>\
-<a class='b' href='/reset'>{restart}</a><br/>\
-<a class='b' href='/debug'>{debug}</a><br/>";
+	<a class='b' href='/status'>{s}</a><br/>\
+	<a class='b' href='https://maps.sensor.community/' target='_blank' rel='noreferrer'>" INTL_ACTIVE_SENSORS_MAP "</a><br/>\
+	<a class='b' href='/config'>{conf}</a><br/>\
+	<a class='b' href='/removeConfig'>" INTL_CONFIGURATION_DELETE "</a><br/>\
+	<a class='b' href='/reset'>{restart}</a><br/>\
+	<a class='b' href='/debug'>{debug}</a><br/>";
+
+const char WEB_ROOT_PAGE_CONTENT_S7000[] PROGMEM = "<a class='b' href='/values'>{t}</a><br/>\
+	<a class='b' href='/status'>{s}</a><br/>\
+	<a class='b' href='https://maps.sensor.community/' target='_blank' rel='noreferrer'>" INTL_ACTIVE_SENSORS_MAP "</a><br/>\
+	<a class='b' href='/config'>{conf}</a><br/>\
+	<a class='b' href='/s7000'>{s7000}</a><br/>\
+	<a class='b' href='/removeConfig'>" INTL_CONFIGURATION_DELETE "</a><br/>\
+	<a class='b' href='/reset'>{restart}</a><br/>\
+	<a class='b' href='/debug'>{debug}</a><br/>";
 
 const char WEB_CONFIG_SCRIPT[] PROGMEM = "<script>\
 function setSSID(ssid){document.getElementById('wlanssid').value=ssid.innerText||ssid.textContent;document.getElementById('wlanpwd').focus();}\
@@ -142,6 +157,7 @@ const char WEB_B_BR[] PROGMEM = "</b><br/>";
 const char WEB_BR_BR[] PROGMEM = "<br/><br/>";
 const char WEB_BR_FORM[] PROGMEM = "<br/></form>";
 const char WEB_BR_LF_B[] PROGMEM = "<br/>\n<b>";
+const char WEB_BR_LF[] PROGMEM = "<br/>\n";
 const char WEB_LF_B[] PROGMEM = "\n<b>";
 const char WEB_CSV[] PROGMEM = "CSV";
 const char WEB_FEINSTAUB_APP[] PROGMEM = "<a target='_blank' href='https://chillibits.com/pmapp'>Feinstaub-App</a>";
@@ -151,6 +167,7 @@ const char WEB_MADAVI[] PROGMEM = "<a target='_blank' href='https://www.madavi.d
 const char WEB_SENSORCOMMUNITY[] PROGMEM = "<a target='_blank' href='https://archive.sensor.community/00disclamer.md'>Sensor.Community</a>";
 const char WEB_HTTPS[] PROGMEM = "HTTPS";
 const char WEB_NBSP_NBSP_BRACE[] PROGMEM = "&nbsp;&nbsp;(";
+const char WEB_NBSP_NBSP[] PROGMEM = "&nbsp;&nbsp;-&nbsp;";
 const char WEB_REPLN_REPLV[] PROGMEM = "\"{n}\":\"{v}\",";
 
 const char WEB_PM1[]   PROGMEM = "PM1";
@@ -172,3 +189,4 @@ const char WEB_NC10[]  PROGMEM = "NC10";
 
 const char WEB_TPS[]   PROGMEM = "TPS";
 const char WEB_GPS[]   PROGMEM = "GPS";
+

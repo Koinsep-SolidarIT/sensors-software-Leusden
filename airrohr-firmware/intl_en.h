@@ -7,13 +7,15 @@
  *	Texts should be as short as possible
  */
 
+#include "./airrohr-logo-common.h"
+
 #define INTL_LANG "EN"
 #define INTL_PM_SENSOR "Particulate matter sensor"
-const char INTL_CONFIGURATION[] PROGMEM = "Configuration";
 #define INTL_WIFI_SETTINGS "WiFi Settings"
 #define INTL_WIFI_NETWORKS "Loading wifi networks ..."
 #define INTL_LANGUAGE "Language"
 
+const char INTL_CONFIGURATION[] PROGMEM = "Configuration";
 const char INTL_NO_NETWORKS[] PROGMEM =  "No WiFi Network Found";
 const char INTL_NETWORKS_FOUND[] PROGMEM = "Found Networks: ";
 const char INTL_AB_HIER_NUR_ANDERN[] PROGMEM = "Advanced settings (оnly if you know what you are doing)";
@@ -26,8 +28,7 @@ const char INTL_HPM[] PROGMEM = "Honeywell PM ({pm})";
 const char INTL_NPM[] PROGMEM = "Tera Sensor Next PM ({pm})";
 const char INTL_NPM_FULLTIME[] PROGMEM = "Next PM fulltime";
 const char INTL_IPS[] PROGMEM = "Piera Systems IPS-7100 ({pm})";
-const char INTL_SEN5X[] PROGMEM = "Sensirion I2C SEN5X ({pm}, {t}, {h}, {voc}, {nox})";
-//const char INTL_SEN5X[] PROGMEM = "Sensirion I2C SEN5X ({pm}, {t}, {h}, {voc})";
+const char INTL_SEN5X[] PROGMEM = "Sensirion SEN5X ({pm}, {t}, {h}, {voc}, {nox})";
 const char INTL_SPS30[] PROGMEM = "Sensirion SPS30 ({pm})";
 const char INTL_PPD42NS[] PROGMEM = "PPD42NS ({pm})";
 const char INTL_DHT22[] PROGMEM = "DHT22 ({t}, {h})";
@@ -37,7 +38,7 @@ const char INTL_BMX280[] PROGMEM = "BME280 ({t}, {h}, {p}), BMP280 ({t}, {p})";
 const char INTL_SHT3X[] PROGMEM = "SHT3X ({t}, {h})";
 const char INTL_SCD30[] PROGMEM = "SCD30 ({t}, {h}, CO₂)";
 const char INTL_DS18B20[] PROGMEM = "DS18B20 ({t})";
-const char INTL_DNMS[] PROGMEM = "DNMS ({l_a})";
+const char INTL_DNMS[] PROGMEM = "DNMS ({l_a}) - Noise sensor";
 const char INTL_DNMS_CORRECTION[] PROGMEM = "correction in dB(A)";
 const char INTL_TEMP_CORRECTION[] PROGMEM = "Correction in °C";
 const char INTL_SCD30_CO2_CORRECTION[] PROGMEM = "Correction in CO₂";
@@ -48,8 +49,10 @@ const char INTL_BASICAUTH[] PROGMEM = "Authentication";
 #define INTL_REPORT_ISSUE "Report an issue"
 
 const char INTL_FS_WIFI_DESCRIPTION[] PROGMEM = "WiFi Sensor in configuration mode";
-const char INTL_FS_WIFI_NAME[] PROGMEM = "Network name";
 const char INTL_MORE_SETTINGS[] PROGMEM = "More settings";
+const char INTL_FS_WIFI_NAME[] PROGMEM = "Network name";
+const char INTL_FS_WIFI_NAME_2[] PROGMEM = "Network name 2";
+const char INTL_FS_WIFI_NAME_3[] PROGMEM = "Network name 3";
 const char INTL_AUTO_UPDATE[] PROGMEM = "Auto update firmware";
 const char INTL_USE_BETA[] PROGMEM = "Load beta firmware";
 const char INTL_DISPLAY[] PROGMEM = "OLED SSD1306";
@@ -61,6 +64,7 @@ const char INTL_LCD2004_27[] PROGMEM = "LCD 2004 (I2C: 0x27)";
 const char INTL_LCD2004_3F[] PROGMEM = "LCD 2004 (I2C: 0x3F)";
 const char INTL_DISPLAY_WIFI_INFO[] PROGMEM = "Display Wifi info";
 const char INTL_DISPLAY_DEVICE_INFO[] PROGMEM = "Display device info";
+
 
 #define INTL_STATIC_IP_TEXT "Configuration static IP address (all fields must be completed)"
 const char INTL_STATIC_IP[] PROGMEM = "IP address";
@@ -84,6 +88,7 @@ const char INTL_SEND_TO_OWN_API[] PROGMEM = "Send data to custom API";
 const char INTL_SERVER[] PROGMEM = "Server";
 const char INTL_PATH[] PROGMEM = "Path";
 const char INTL_PORT[] PROGMEM = "Port";
+const char INTL_MOTION_WAIT_TIME[] PROGMEM = "Motion wait time";
 const char INTL_USER[] PROGMEM = "User";
 const char INTL_PASSWORD[] PROGMEM = "Password";
 const char INTL_MEASUREMENT[] PROGMEM = "Measurement";
@@ -126,7 +131,7 @@ const char INTL_PRESSURE[] PROGMEM = "air pressure";
 const char INTL_VOC[] PROGMEM = "Volatile organic compound";
 const char INTL_NOX[] PROGMEM = "Nitrogen oxides";
 const char INTL_DEW_POINT[] PROGMEM = "dew point";
-const char INTL_CO2_PPM[] PROGMEM = "ppm CO₂";
+const char INTL_CO2_PPM[] PROGMEM = "CO₂";
 const char INTL_LEQ_A[] PROGMEM = "LAeq";
 const char INTL_LA_MIN[] PROGMEM = "LA min";
 const char INTL_LA_MAX[] PROGMEM = "LA max";
@@ -136,10 +141,24 @@ const char INTL_ALTITUDE[] PROGMEM = "Altitude";
 const char INTL_TIME_UTC[] PROGMEM = "Time (UTC)";
 const char INTL_SIGNAL_STRENGTH[] PROGMEM = "signal strength";
 const char INTL_SIGNAL_QUALITY[] PROGMEM = "signal quality";
+
 #define INTL_NUMBER_OF_MEASUREMENTS "Number of measurements"
+#define INTL_NUMBER_OF_RADARMOTION "Number of radar motions"
 #define INTL_TIME_SENDING_MS "Time spent uploading"
 #define INTL_SENSOR "Sensor"
 #define INTL_PARAMETER "Parameter"
 #define INTL_VALUE "Value"
 
-#include "./airrohr-logo-common.h"
+#define INTL_ENABLE_S7000 "Enable S7000 LTE"
+
+const char INTL_SIM7000_CONFIGURATION[] PROGMEM = "Sim7000 LTE";
+const char INTL_SIM7000_DIS[] PROGMEM = "Disable";
+const char INTL_SIM_APN[] PROGMEM = "APN";
+const char INTL_SIM_ID[] PROGMEM = "ID";
+const char INTL_SIM_GPS[] PROGMEM = "GPS";
+const char INTL_SIM_TYPE[] PROGMEM = "Type";
+const char INTL_SIM_MODE[] PROGMEM = "Mode";
+
+#define INTL_ENABLE_RCWL_0516 "Enable Radar Motion (after enable reboot and insert server credentials)"
+
+#define INTL_MODE "Mode"

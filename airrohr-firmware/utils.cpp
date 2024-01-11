@@ -170,45 +170,56 @@ void configureCACertTrustAnchor(WiFiClientSecure* client) {
 							  (__DATE__[ 8] - '0') *  100 + \
 							  (__DATE__[ 9] - '0') *   10 + \
 							  (__DATE__[10] - '0');
-	if (time(nullptr) < (fw_built_year - 1970) * 365 * 24 * 3600) {
+
+	if (time(nullptr) < (fw_built_year - 1970) * 365 * 24 * 3600) 
+	{
 		debug_outln_info(F("Time incorrect; Disabling CA verification."));
-		client->setInsecure();
+		client->setInsecure(); 					// this is the magical line that makes everything work
 	}
-	else {
+	else 
+	{
 		client->setTrustAnchors(&x509_dst_root_ca);
 	}
 }
 
-bool launchUpdateLoader(const String& md5) {
+bool launchUpdateLoader(const String& md5) 
+{
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored  "-Wdeprecated-declarations"
 
 	File loaderFile = SPIFFS.open(F("/loader.bin"), "r");
-	if (!loaderFile) {
+	if (!loaderFile) 
+	{
 		return false;
 	}
 
-	if (!Update.begin(loaderFile.size(), U_FLASH)) {
+	if (!Update.begin(loaderFile.size(), U_FLASH)) 
+	{
 		return false;
 	}
 
-	if (md5.length() && !Update.setMD5(md5.c_str())) {
+	if (md5.length() && !Update.setMD5(md5.c_str())) 
+	{
 		return false;
 	}
 
-	if (Update.writeStream(loaderFile) != loaderFile.size()) {
+	if (Update.writeStream(loaderFile) != loaderFile.size()) 
+	{
 		return false;
 	}
+
 	loaderFile.close();
 
-	if (!Update.end()) {
+	if (!Update.end()) 
+	{
 		return false;
 	}
 
 	debug_outln_info(F("Erasing SDK config."));
 	ESP.eraseConfig();
 	return true;
+	
 #pragma GCC diagnostic pop
 }
 
@@ -304,7 +315,8 @@ size_t LoggingSerial::write(uint8_t c)
 size_t LoggingSerial::write(const uint8_t *buffer, size_t size)
 {
 #if defined(ESP32)
-	for(int i = 0; i < size; i++) {
+	for(int i = 0; i < size; i++) 
+	{
 		xQueueSendToBack(m_buffer, ( void * ) &buffer[i], ( TickType_t ) 1);
 	}
 #endif
@@ -318,23 +330,29 @@ String LoggingSerial::popLines()
 {
 	String r;
 #if defined(ESP8266)
-	while (m_buffer->available() > 0) {
+	while (m_buffer->available() > 0) 
+	{
 		uint8_t c = m_buffer->pop();
 		r += (char) c;
 
 		if (c == '\n' && r.length() > m_buffer->available())
+		{
 			break;
+		}
 	}
 #endif
+
 #if defined(ESP32)
 	uint8_t c;
-	while (xQueueReceive(m_buffer, &(c ), (TickType_t) 1 )) {
+	while (xQueueReceive(m_buffer, &(c ), (TickType_t) 1 )) 
+	{
 		r += (char) c;
 
 		if (c == '\n' && r.length() > 10)
 			break;
 	}
 #endif
+
 	return r;
 }
 
@@ -471,16 +489,20 @@ bool SDS_cmd(PmSensorCmd cmd)
 /*****************************************************************
  * send Plantower PMS sensor command start, stop, cont. mode     *
  *****************************************************************/
-bool PMS_cmd(PmSensorCmd cmd) {
+bool PMS_cmd(PmSensorCmd cmd) 
+{
 	static constexpr uint8_t start_cmd[] PROGMEM = {
 		0x42, 0x4D, 0xE4, 0x00, 0x01, 0x01, 0x74
 	};
+
 	static constexpr uint8_t stop_cmd[] PROGMEM = {
 		0x42, 0x4D, 0xE4, 0x00, 0x00, 0x01, 0x73
 	};
+
 	static constexpr uint8_t continuous_mode_cmd[] PROGMEM = {
 		0x42, 0x4D, 0xE1, 0x00, 0x01, 0x01, 0x71
 	};
+	
 	constexpr uint8_t cmd_len = array_num_elements(start_cmd);
 
 	uint8_t buf[cmd_len];
@@ -495,6 +517,7 @@ bool PMS_cmd(PmSensorCmd cmd) {
 		memcpy_P(buf, continuous_mode_cmd, cmd_len);
 		break;
 	}
+	
 	serialSDS.write(buf, cmd_len);
 	return cmd != PmSensorCmd::Stop;
 }

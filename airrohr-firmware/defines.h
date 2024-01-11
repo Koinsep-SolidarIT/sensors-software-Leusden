@@ -4,9 +4,15 @@
  *
  */
 
+// Select LTE/GSM modem type: SIM7000E
+#define TINY_GSM_MODEM_SIM7000              // version does not support SSL but supports up to 8 simultaneous connections.
+// #define TINY_GSM_MODEM_SIM7000SSL        // version supports both SSL and unsecured connections with up to 2 simultaneous connections.
+
 #if defined(ESP8266)
 #define SENSOR_BASENAME "esp8266-"
 #define OTA_BASENAME "/airrohr"
+
+#define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"  // Europe/Amsterdam, see Timezone: https://leo.leung.xyz/wiki/Timezone
 #endif
 
 #if defined(ESP32)
@@ -16,6 +22,8 @@
 
 #define SSID_BASENAME "airRohr-"
 #define HOSTNAME_BASE "airRohr-"
+
+#define WIFI_MAX_RETRY 5
 
 #define LEN_CFG_STRING 65
 #define LEN_CFG_PASSWORD 65
@@ -32,12 +40,14 @@
 
 #define LEN_SENSEBOXID 30
 
-#define LEN_HOST_INFLUX 100
+#define LEN_HOST_INFLUX 100         
 #define LEN_URL_INFLUX 100
 #define LEN_USER_INFLUX 65
 #define LEN_PASS_INFLUX 90
 #define LEN_MEASUREMENT_NAME_INFLUX 100
-#define LEN_MQTT_HEADER 40 
+
+#define LEN_MQTT_LARGE_HEADER 90 
+#define LEN_MQTT_HEADER 30
 
 #define LEN_HOST_CUSTOM 100
 #define LEN_URL_CUSTOM 100
@@ -45,6 +55,8 @@
 #define MAX_PORT_DIGITS 5
 
 #define LEN_STATIC_ADRESS  16
+#define LEN_SIMM7000 30
+#define LEN_SEN5X_SYM 6
 
 // define debug levels
 #define DEBUG_ERROR 1
@@ -53,10 +65,12 @@
 #define DEBUG_MED_INFO 4
 #define DEBUG_MAX_INFO 5
 
+
 /******************************************************************
  * Constants                                                      *
  ******************************************************************/
-constexpr const unsigned long SLEEPTIME_MS = 250;
+constexpr unsigned long MemUseConfig  = 0;
+constexpr const unsigned long SLEEPTIME_MS = 250;                                       // 250 msec.
 constexpr const unsigned long SAMPLETIME_MS = 30000;									// time between two measurements of the PPD42NS
 constexpr const unsigned long SAMPLETIME_SDS_MS = 1000;								    // time between two measurements of the SDS011, PMSx003, Honeywell PM sensor
 constexpr const unsigned long WARMUPTIME_SDS_MS = 15000;								// time needed to "warm up" the sensor before we can take the first measurement
@@ -74,10 +88,19 @@ constexpr const unsigned long ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 constexpr const unsigned long PAUSE_BETWEEN_UPDATE_ATTEMPTS_MS = ONE_DAY_IN_MS;		    // check for firmware updates once a day
 constexpr const unsigned long DURATION_BEFORE_FORCED_RESTART_MS = ONE_DAY_IN_MS * 28;	// force a reboot every ~4 weeks
 
+constexpr const unsigned long SAMPLETIME_SEN5X_MS = 1200;								// time between two measurements of the SEN5X PM / temp. / hum. sensor.
+constexpr const unsigned long READINGTIME_SEN5X_MS = 9 * SAMPLETIME_SEN5X_MS;			// how long we read data from the SEN5X PM sensors.
+constexpr const unsigned long SEN5X_WAITING_AFTER_LAST_READ = 31000;                    // 31 sec. waiting time after Start reading mesurement command in ms.
+constexpr const unsigned long SEN5X_AUTO_CLEANING_INTERVAL = 3 * 24 * 60 * 60 * 1000;   // SEN5X Sensor FAN auto cleaning every 3 days. time in seconds
+
+constexpr const unsigned long SPS30_WAITING_AFTER_LAST_READ = 11000;                    // waiting time after last reading mesurement data in ms
+constexpr const unsigned long SPS30_AUTO_CLEANING_INTERVAL = 7200;                      // time in seconds
+
 // Definition GPIOs for Zero based Arduino Feather M0 LoRaWAN
 #if defined(ARDUINO_SAMD_ZERO) && defined(SERIAL_PORT_USBVIRTUAL)
 // Required for Serial on Zero based boards
 #define Serial SERIAL_PORT_USBVIRTUAL
+
 //GPIO Pins
 #define D0 0
 #define D1 1

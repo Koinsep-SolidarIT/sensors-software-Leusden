@@ -7,6 +7,8 @@
  *	Texts should be as short as possible
  */
 
+#include "./airrohr-logo-common.h"
+
 #define INTL_LANG "NL"
 #define INTL_PM_SENSOR "Fijnstofsensor"
 #define INTL_WIFI_SETTINGS "WiFi-instellingen"
@@ -26,7 +28,7 @@ const char INTL_HPM[] PROGMEM = "Honeywell PM ({pm})";
 const char INTL_NPM[] PROGMEM = "Tera Sensor Next PM ({pm})";
 const char INTL_NPM_FULLTIME[] PROGMEM = "Next PM fulltime";
 const char INTL_IPS[] PROGMEM = "Piera Systems IPS-7100 ({pm})";
-const char INTL_SEN5X[] PROGMEM = "Sensirion I2C SEN5X ({pm}, {t}, {h}, {voc}, {nox})";
+const char INTL_SEN5X[] PROGMEM = "Sensirion SEN5X ({pm}, {t}, {h}, {voc}, {nox})";
 const char INTL_SPS30[] PROGMEM = "Sensirion SPS30 ({pm})";
 const char INTL_PPD42NS[] PROGMEM = "PPD42NS ({pm})";
 const char INTL_DHT22[] PROGMEM = "DHT22 ({t}, {h})";
@@ -36,7 +38,7 @@ const char INTL_BMX280[] PROGMEM = "BME280 ({t}, {h}, {p}), BMP280 ({t}, {p})";
 const char INTL_SHT3X[] PROGMEM = "SHT3X ({t}, {h})";
 const char INTL_SCD30[] PROGMEM = "SCD30 ({t}, {h}, CO₂)";
 const char INTL_DS18B20[] PROGMEM = "DS18B20 ({t})";
-const char INTL_DNMS[] PROGMEM = "DNMS ({l_a})";
+const char INTL_DNMS[] PROGMEM = "DNMS ({l_a}) - Geluid sensor";
 const char INTL_DNMS_CORRECTION[] PROGMEM = "Correctie in dB(A)";
 const char INTL_TEMP_CORRECTION[] PROGMEM = "Correctie in °C";
 const char INTL_HEIGHT_ABOVE_SEALEVEL[] PROGMEM = "Hoogte boven zeeniveau (m)";
@@ -47,6 +49,8 @@ const char INTL_BASICAUTH[] PROGMEM = "Toegang beperken";
 
 const char INTL_FS_WIFI_DESCRIPTION[] PROGMEM = "Netwerknaam en -wachtwoord van de fijnstofsensor";
 const char INTL_FS_WIFI_NAME[] PROGMEM = "Naam (SSID)";
+const char INTL_FS_WIFI_NAME_2[] PROGMEM = "Naam (SSID) 2";
+const char INTL_FS_WIFI_NAME_3[] PROGMEM = "Naam (SSID) 3";
 const char INTL_MORE_SETTINGS[] PROGMEM = "Meer instellingen";
 const char INTL_AUTO_UPDATE[] PROGMEM = "Firmware automatisch bijwerken";
 const char INTL_USE_BETA[] PROGMEM = "Installeer beta-firmwares";
@@ -85,6 +89,7 @@ const char INTL_SERVER[] PROGMEM = "Serveradres";
 const char INTL_PATH[] PROGMEM = "Pad";
 const char INTL_PORT[] PROGMEM = "Poort";
 const char INTL_USER[] PROGMEM = "Gebruiker";
+const char INTL_MOTION_WAIT_TIME[] PROGMEM = "Motion wacht tijd";
 const char INTL_PASSWORD[] PROGMEM = "Wachtwoord";
 const char INTL_MEASUREMENT[] PROGMEM = "Measurement";
 const char INTL_SEND_TO[] PROGMEM = "Verzend naar {v}";
@@ -126,7 +131,7 @@ const char INTL_PRESSURE[] PROGMEM = "Luchtdruk";
 const char INTL_VOC[] PROGMEM = "Vluchtige organische stoffen";
 const char INTL_NOX[] PROGMEM = "Stikstofoxiden";
 const char INTL_DEW_POINT[] PROGMEM = "Dauwpunt";
-const char INTL_CO2_PPM[] PROGMEM = "ppm CO₂";
+const char INTL_CO2_PPM[] PROGMEM = "CO₂";
 const char INTL_LEQ_A[] PROGMEM = "LAeq";
 const char INTL_LA_MIN[] PROGMEM = "LA min";
 const char INTL_LA_MAX[] PROGMEM = "LA max";
@@ -137,9 +142,24 @@ const char INTL_TIME_UTC[] PROGMEM = "Tijd (UTC)";
 const char INTL_SIGNAL_STRENGTH[] PROGMEM = "Signaalsterkte";
 const char INTL_SIGNAL_QUALITY[] PROGMEM = "Signaalkwaliteit";
 #define INTL_NUMBER_OF_MEASUREMENTS "Aantal metingen"
+#define INTL_NUMBER_OF_RADARMOTION "Aantal radar motions"
 #define INTL_TIME_SENDING_MS "Tijdsduur opsturen metingen"
 #define INTL_SENSOR "Sensor"
 #define INTL_PARAMETER "Parameter"
 #define INTL_VALUE "Waarde"
 
-#include "./airrohr-logo-common.h"
+#define INTL_ENABLE_S7000 "Enable S7000 LTE"
+
+const char INTL_SIM7000[] PROGMEM = "Sim7000 LTE";
+const char INTL_SIM7000_CONFIGURATION[] PROGMEM = "Sim7000 LTE";
+const char INTL_SIM7000_DIS[] PROGMEM = "Disable";
+
+const char INTL_SIM_APN[] PROGMEM = "APN";
+const char INTL_SIM_ID[] PROGMEM = "ID";
+const char INTL_SIM_GPS[] PROGMEM = "GPS";
+const char INTL_SIM_TYPE[] PROGMEM = "Type";
+const char INTL_SIM_MODE[] PROGMEM = "Mode";
+
+#define INTL_ENABLE_RCWL_0516 "Radar Motion aan (after enable reboot and insert server credentials)"
+
+#define INTL_MODE "Mode"

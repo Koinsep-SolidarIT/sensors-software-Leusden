@@ -1,3 +1,14 @@
+FWL-2023-12-B1  (Fijnstof Werkgroep Leusden)
+* Change config web
+* add allways on SEN5X
+
+FWL-2023-11-B1  (Fijnstof Werkgroep Leusden)
+* Add multi SSID
+* WIFI retry (5)
+
+FWL-2023-09-B1  (Fijnstof Werkgroep Leusden)
+* Add sim7000 LTE
+
 FWL-2023-08-B1  (Fijnstof Werkgroep Leusden)
 * SEN5X sensor
 * MQTT
