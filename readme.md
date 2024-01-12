@@ -62,7 +62,8 @@ https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
 https://www.cmlleusden.nl/handleidingen-fijnstofmeter.html
 
 ## Config SEN55 on opensensemap and sensorcommunity
-Fake sensor SEN55 and use SPS30 and SCD30
+
+Sensorcommunity PM is on PIN 1 and Temp/Hum is on PIN 7 
 
 See example picture on WIKI
 
