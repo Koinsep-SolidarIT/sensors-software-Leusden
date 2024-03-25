@@ -27,7 +27,7 @@ The development is done in the beta branch.
 
 ## Directories 
 
-* /bin      - flasher (FlashESP8266) and firmware bin
+* /bin      - flasher (FlashESP8266) and firmware bin (firmware.zip)
 * /Doc      - manual/handleiding 
 * /Doc/PCB 	- schematic and Gerberfile
 
