@@ -10,7 +10,7 @@
 
 #if defined(ESP8266)
 #define SENSOR_BASENAME "esp8266-"
-#define OTA_BASENAME "/airrohr"
+#define OTA_BASENAME    "air.fijnstofleusden.nl"
 
 #define MY_TZ "CET-1CEST,M3.5.0/02,M10.5.0/03"  // Europe/Amsterdam, see Timezone: https://leo.leung.xyz/wiki/Timezone
 #endif
@@ -58,6 +58,11 @@
 #define LEN_SIMM7000 30
 #define LEN_SEN5X_SYM 6
 
+#define LTEMODEM_BAUD	9600
+#define SERIALSIM_BAUD	115200
+
+#define MAXBUF_REQUIREMENT 48
+
 // define debug levels
 #define DEBUG_ERROR 1
 #define DEBUG_WARNING 2
@@ -65,6 +70,11 @@
 #define DEBUG_MED_INFO 4
 #define DEBUG_MAX_INFO 5
 
+//#define SENSOR_SEN50   "SEN50"        // remove 2024-03-20
+//#define SENSOR_SEN54   "SEN54"        // remove 2024-03-20
+#define SENSOR_SEN55   "SEN55"
+  
+#define SENSOR_SCD30   "SCD30"
 
 /******************************************************************
  * Constants                                                      *
@@ -89,12 +99,14 @@ constexpr const unsigned long PAUSE_BETWEEN_UPDATE_ATTEMPTS_MS = ONE_DAY_IN_MS;	
 constexpr const unsigned long DURATION_BEFORE_FORCED_RESTART_MS = ONE_DAY_IN_MS * 28;	// force a reboot every ~4 weeks
 
 constexpr const unsigned long SAMPLETIME_SEN5X_MS = 1200;								// time between two measurements of the SEN5X PM / temp. / hum. sensor.
-constexpr const unsigned long READINGTIME_SEN5X_MS = 9 * SAMPLETIME_SEN5X_MS;			// how long we read data from the SEN5X PM sensors.
+constexpr const unsigned long READINGTIME_SEN5X_MS = 15 * SAMPLETIME_SEN5X_MS;			// how many times reading sensor data (PM/No/tem/hum/..) from the SEN5X sensors.
 constexpr const unsigned long SEN5X_WAITING_AFTER_LAST_READ = 31000;                    // 31 sec. waiting time after Start reading mesurement command in ms.
-constexpr const unsigned long SEN5X_AUTO_CLEANING_INTERVAL = 3 * 24 * 60 * 60 * 1000;   // SEN5X Sensor FAN auto cleaning every 3 days. time in seconds
+constexpr const unsigned long SEN5X_AUTO_CLEANING_INTERVAL = 1 * 24 * 60 * 60 * 1000;   // SEN5X Sensor FAN auto cleaning every 1 day(s). time in seconds.
 
 constexpr const unsigned long SPS30_WAITING_AFTER_LAST_READ = 11000;                    // waiting time after last reading mesurement data in ms
 constexpr const unsigned long SPS30_AUTO_CLEANING_INTERVAL = 7200;                      // time in seconds
+
+#define TIMEOUTFORTCPCONNECTION 60 * 1000                                               // set the timeout for the TCP connection
 
 // Definition GPIOs for Zero based Arduino Feather M0 LoRaWAN
 #if defined(ARDUINO_SAMD_ZERO) && defined(SERIAL_PORT_USBVIRTUAL)

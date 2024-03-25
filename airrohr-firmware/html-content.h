@@ -12,7 +12,7 @@ const char DBG_TXT_TEMPERATURE[] PROGMEM = "Temperature (°C): ";
 const char DBG_TXT_HUMIDITY[] PROGMEM = "Humidity (%): ";
 const char DBG_TXT_PRESSURE[] PROGMEM = "Pressure (hPa): ";
 const char DBG_TXT_CO2PPM[] PROGMEM = "CO₂ (ppm): ";
-const char DBG_TXT_VOCINDEX[] PROGMEM = "VOC index : ";
+const char DBG_TXT_VOCINDEX[] PROGMEM = "VOC index: ";
 const char DBG_TXT_NOX[] PROGMEM = "NOx index: ";
 const char DBG_TXT_START_READING[] PROGMEM = "R/ ";
 const char DBG_TXT_END_READING[] PROGMEM = "/R ";
@@ -36,11 +36,12 @@ const char SENSORS_PMSx003[] PROGMEM = "PMSx003";
 const char SENSORS_HPM[] PROGMEM = "Honeywell PM";
 const char SENSORS_NPM[] PROGMEM = "Tera Sensor Next PM";
 const char SENSORS_IPS[] PROGMEM = "Piera Systems IPS-7100";
-const char SENSORS_SPS30[] PROGMEM = "Sensirion SPS30";
-const char SENSORS_SEN50[] PROGMEM = "Sensirion SEN50";
-const char SENSORS_SEN54[] PROGMEM = "Sensirion SEN54";
-const char SENSORS_SEN55[] PROGMEM = "Sensirion SEN55";
-const char SENSORS_SEN5X_TH[] PROGMEM = "Sensirion SEN5X TH";
+const char MANUFACTURER[] PROGMEM = "Sensirion ";
+const char SENSORS_SPS30[] PROGMEM = "SPS30";
+const char SENSORS_SEN50[] PROGMEM = "SEN50";
+const char SENSORS_SEN54[] PROGMEM = "SEN54";
+const char SENSORS_SEN55[] PROGMEM = "SEN55";
+const char SENSORS_SEN5X_TH[] PROGMEM = "SEN5X TH";
 const char SENSORS_DHT22[] PROGMEM = "DHT22";
 const char SENSORS_DS18B20[] PROGMEM = "DS18B20";
 const char SENSORS_HTU21D[] PROGMEM = "HTU21D";
@@ -64,6 +65,7 @@ body{font-family:Arial,sans-serif;margin:0}	\
 td{vertical-align:top}	\
 .v>tbody>tr:nth-child(odd){background:#e7e6d1}	\
 .b{text-decoration:none;padding:10px;background:#055d52;color:#fff;display:block;width:auto;border-radius:5px;}	\
+.c{text-decoration:none;padding:10px;background:#5d0505;color:#fff;display:block;width:auto;border-radius:5px;}	\
 .wifi{background:0 0;color:#00f;padding:5px;display:inline;border:0;}	\
 input[type=text]{width:100%}	\
 input[type=password]{width:100%}	\
@@ -79,7 +81,9 @@ input[type=submit]:hover{background:#167908}\
 #r4:checked~.tabs>#tab4,#r1:checked~.tabs>#tab1,#r3:checked~.tabs>#tab3,#r2:checked~.tabs>#tab2{background:#055d52;color:#fff}\
 #sen5x_sym_pm{background:#055d52;color:#fff}\
 #sen5x_sym_th{background:#055d52;color:#fff}\
+#sen5x_pin{background:#055d52;color:#fff}\
 #s7000_mode{background:#055d52;color:#fff}\
+#current_lang{background:#055d52;color:#fff}\
 input[type=checkbox]{accent-color: rgb(255, 255, 128);}";
 
 #define STATIC_PREFIX "/" INTL_LANG "_s1"
@@ -119,7 +123,8 @@ const char WEB_ROOT_PAGE_CONTENT[] PROGMEM = "<a class='b' href='/values'>{t}</a
 	<a class='b' href='/config'>{conf}</a><br/>\
 	<a class='b' href='/removeConfig'>" INTL_CONFIGURATION_DELETE "</a><br/>\
 	<a class='b' href='/reset'>{restart}</a><br/>\
-	<a class='b' href='/debug'>{debug}</a><br/>";
+	<a class='b' href='/debug'>{debug}</a><br/>\
+	<a class='c' href='/update'>{update}</a><br/>";
 
 const char WEB_ROOT_PAGE_CONTENT_S7000[] PROGMEM = "<a class='b' href='/values'>{t}</a><br/>\
 	<a class='b' href='/status'>{s}</a><br/>\
@@ -128,7 +133,8 @@ const char WEB_ROOT_PAGE_CONTENT_S7000[] PROGMEM = "<a class='b' href='/values'>
 	<a class='b' href='/s7000'>{s7000}</a><br/>\
 	<a class='b' href='/removeConfig'>" INTL_CONFIGURATION_DELETE "</a><br/>\
 	<a class='b' href='/reset'>{restart}</a><br/>\
-	<a class='b' href='/debug'>{debug}</a><br/>";
+	<a class='b' href='/debug'>{debug}</a><br/>\
+	<a class='c' href='/update'>{update}</a><br/>";
 
 const char WEB_CONFIG_SCRIPT[] PROGMEM = "<script>\
 function setSSID(ssid){document.getElementById('wlanssid').value=ssid.innerText||ssid.textContent;document.getElementById('wlanpwd').focus();}\
@@ -144,6 +150,12 @@ const char WEB_RESET_CONTENT[] PROGMEM = "<h3>" INTL_REALLY_RESTART_SENSOR "</h3
 "<table><tr><td><form method='POST' action'/reset'>" \
 "<input type='submit' class='s_red' name='submit' value='" INTL_RESTART "'/>"\
 "</form></td><td><a class='b' href='/'>" INTL_CANCEL "</a></td></tr></table>";
+
+const char WEB_UPDATE_FIRMWARE[] PROGMEM = "<h3> Really Update Firmware? </h3>"
+										   "<table><tr><td><form method='POST' action'/reset'>"
+										   "<input type='submit' class='s_red' name='submit' value=' Update firmware'/>"
+										   "</form></td><td><a class='b' href='/'>" INTL_CANCEL "</a></td></tr></table>";
+
 
 const char WEB_IOS_REDIRECT[] PROGMEM = "<html><body>Redirecting...\
 <script type=\"text/javascript\">\

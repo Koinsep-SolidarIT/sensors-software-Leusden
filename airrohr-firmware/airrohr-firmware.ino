@@ -5,7 +5,7 @@
  *                                                                      *
  ************************************************************************
  *                                                                      *
- *    airRohr firmware                                                  *
+ *  airRohr firmware                                                    *
  *    Copyright (C) 2016-2021  Code for Stuttgart a.o.                  *
  *    Copyright (C) 2019-2020  Dirk Mueller                             *
  *                                                                      *
@@ -49,10 +49,10 @@
  * SEN55: devided in SPS30 for PM, TS, NOx	(pin 1)						*
  * 					 SCD30 for temperature, humidity, CO2(NOx) (pin 17)	*
  * 			Change to													*
- * 					 SHT30 for temperature, humidity (pin 7)			*
+ * 					 SHT3x for temperature, humidity (pin 7)			*
  * 																		*
  * Remark: SEN5X sensor start/stop is enabled then Nox value = 0.		*
- * startUp time = 35 sec. then 9 times read PM/NC, Temp., Hum value.	*
+ * startUp time = 35 sec. then 15 times read PM/NC, Temp., Hum value.	*
  * Nox startUp time at least 60 sec. then read Nox value (F.F.U)		*
  * 																		*
  * Wifi signal MUST be strong.											*
@@ -65,6 +65,13 @@
  * Add WiFiMulti used to connect to a WiFi network with strongest 		*
  * WiFi signal (RSSI). 													*
  * 																		*
+ * There is a hardware WDT and a software WDT.							*
+ * The HW WDT is always running and will reset the MCU after about		* 
+ * 6 seconds if the HW WDT timer is not reset.							*
+ * The SW WDT seems to reset the MCU at 1.5 about seconds.				*
+ * You can enable/disable the SW WDT, but not the HW WDT.				*
+ * There seems to be little point in disabling the SW WDT as you must 	*
+ * reset it to also reset the HW WDT.									*	
  ************************************************************************
  * 																		*
  * latest build using lib 3.1.0											*
@@ -79,10 +86,11 @@
  * RAM:     [=====     ]  46.0% (used 37696 bytes from 81920 bytes)		*
  * PROGRAM: [======    ]  61.6% (used 643167 bytes from 1044464 bytes)	*
  * 																		*
- * latest build 2024-01-13												*
+ * latest build 2024-03-25												*
  * PLATFORM: Espressif 8266 (3.1.0) > NodeMCU 1.0 (ESP-12E Module)		*
- * RAM:     [=====     ]  47.0% (used 38488 bytes from 81920 bytes)		*
- * PROGRAM: [======    ]  62.3% (used 650991 bytes from 1044464 bytes)	*
+ * HARDWARE: ESP8266 160MHz, 80KB RAM, 4MB Flash						*
+ * RAM:     [=====     ]  47.4% (used 38864 bytes from 81920 bytes)		*
+ * PROGRAM: [======    ]  64.1% (used 669133 bytes from 1044464 bytes)	*
  ************************************************************************/
 
 // VS: Convert Arduino file to C++ manually.
@@ -92,7 +100,7 @@
 #include <pgmspace.h>
 
 // increment on change
-#define SOFTWARE_VERSION_STR "FWL-2024-01-B1"
+#define SOFTWARE_VERSION_STR "FWL-2024-03-P5"
 String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 
 /*****************************************************************
@@ -167,6 +175,7 @@ String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 #include "ext_def.h"
 #include "html-content.h"
 #include "./airrohr-cfg7000.h"
+#include "./sim7000_html.h"
 #include "./RCWL-0516.h"
 
 // Temp language fields
@@ -228,6 +237,7 @@ namespace cfg
 	bool sen5x_on = SEN5X_ON;
 	char sen5x_sym_pm[LEN_SEN5X_SYM] = SEN5X_SYM_PM;
 	char sen5x_sym_th[LEN_SEN5X_SYM] = SEN5X_SYM_TH;
+	bool sen5x_pin16 = SEN5X_PIN16;
 	bool sps30_read = SPS30_READ;
 	bool bmp_read = BMP_READ;
 	bool bmx280_read = BMX280_READ;
@@ -386,6 +396,10 @@ PubSubClient mqtt_client(mqtt_wifi);
 WebServer server(80);
 #endif
 
+#if defined(CLIENTSECURE)
+#define BR_TLS13 0x0304
+#endif
+
 // default IPv4 address (ex. 192.168.4.1)
 const uint8_t default_ip_first_octet = 192;
 const uint8_t default_ip_second_octet = 168;
@@ -476,6 +490,13 @@ DallasTemperature ds18b20(&oneWire);
 /*****************************************************************
  * SEN5X declaration                                             *
  *****************************************************************/
+unsigned char SEN5X_type[6];
+
+#if (defined(I2C_BUFFER_LENGTH) && (I2C_BUFFER_LENGTH >= MAXBUF_REQUIREMENT)) ||  \
+    (defined(BUFFER_LENGTH)     && BUFFER_LENGTH >= MAXBUF_REQUIREMENT)
+ #define USE_PRODUCT_INFO
+#endif
+
 SensirionI2CSen5x sen5x;
 
 /*****************************************************************
@@ -508,7 +529,6 @@ unsigned long starttime_SDS;
 unsigned long starttime_GPS;
 unsigned long starttime_NPM;
 unsigned long starttime_IPS;
-unsigned long starttime_MQTT;
 
 unsigned long act_micro;
 unsigned long act_milli;
@@ -810,6 +830,8 @@ unsigned long count_sends = 0;
 unsigned long last_display_millis = 0;
 uint8_t next_display_count = 0;
 
+volatile bool flg_OTAStartbyWebCall = false;
+
 struct struct_wifiInfo
 {
 	char ssid[LEN_WLANSSID];
@@ -883,6 +905,47 @@ static void display_debug(const String &text1, const String &text2)
 		lcd_2004->print(text2);
 	}
 }
+
+/*
+
+*/
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void readFileContents( String fileName)
+{
+	debug_outln_verbose(F("Reading file contents: "), fileName);
+
+	// Read File data
+	fs::File rdfile = SPIFFS.open(fileName, "r");
+
+	if (!rdfile)
+	{
+		debug_outln_verbose(F("file open failed"));
+	}
+	else
+	{
+		debug_outln_verbose(F("Reading Data from File:"));
+
+		int len = rdfile.size() > 252 ? 256 : rdfile.size() + 4;
+
+		RESERVE_STRING(tmp, len);
+
+		// Data from file. (max. 256 bytes)
+		for (int idx = 0; idx < len; idx++) // Read upto complete file size
+		{
+			tmp += (char)rdfile.read();
+		}
+
+		debug_outln_info(F("file contents: "), tmp);
+		debug_outln_info(F("file size: "), len);
+
+		rdfile.close(); // Close file
+
+		debug_outln_info(F("File Closed"));
+	}
+}
+#pragma GCC diagnostic pop
 
 /*****************************************************************
  * read SDS011 sensor serial and firmware date                   *
@@ -1280,16 +1343,6 @@ static String IPS_version_date()
 /*****************************************************************
  * read SEN5X sensor serial and firmware date                    *
  *****************************************************************/
-
-unsigned char SEN5X_type[6];
-
-#define MAXBUF_REQUIREMENT 48
-
-#if (defined(I2C_BUFFER_LENGTH) && (I2C_BUFFER_LENGTH >= MAXBUF_REQUIREMENT)) ||  \
-    (defined(BUFFER_LENGTH)     && BUFFER_LENGTH >= MAXBUF_REQUIREMENT)
- #define USE_PRODUCT_INFO
-#endif
-
 void printModuleVersions() 
 {
     uint16_t error;
@@ -1302,13 +1355,13 @@ void printModuleVersions()
 
     if (error) 
 	{
-        Debug.print("Error trying to execute getProductName(): ");
+        Debug.print(F("Error trying to execute getProductName(): "));
         errorToString(error, errorMessage, 256);
         Debug.println(errorMessage);
     } 
 	else
 	{
-        Debug.print("ProductName:");
+        Debug.print(F("ProductName: "));
         Debug.println((char*)productName);
 		memcpy(SEN5X_type, productName, 6);
 
@@ -1328,21 +1381,21 @@ void printModuleVersions()
                              protocolMinor);
     if (error) 
 	{
-        Debug.print("Error trying to execute getVersion(): ");
+        Debug.print(F("Error trying to execute getVersion(): "));
         errorToString(error, errorMessage, 256);
         Debug.println(errorMessage);
     } 
 	else 
 	{
-        Debug.print("Firmware: ");
+        Debug.print(F("Firmware: "));
         Debug.print(firmwareMajor);
-        Debug.print(".");
+        Debug.print(F("."));
         Debug.print(firmwareMinor);
-        Debug.print(", ");
+        Debug.print(F(", "));
 
-        Debug.print("Hardware: ");
+        Debug.print(F("Hardware: "));
         Debug.print(hardwareMajor);
-        Debug.print(".");
+        Debug.print(F("."));
         Debug.println(hardwareMinor);
     }
 }
@@ -1358,13 +1411,13 @@ void printSerialNumber()
 
     if (error) 
 	{
-        Debug.print("Error trying to execute getSerialNumber(): ");
+        Debug.print(F("Error trying to execute getSerialNumber(): "));
         errorToString(error, errorMessage, 256);
         Debug.println(errorMessage);
     } 
 	else 
 	{
-        Debug.print("SerialNumber:");
+        Debug.print(F("SerialNumber: "));
         Debug.println((char*)serialNumber);
     }
 }
@@ -1375,12 +1428,12 @@ void printSerialNumber()
  *****************************************************************/
 static void disable_unneeded_nmea()
 {
-	serialGPS->println(F("$PUBX,40,GLL,0,0,0,0*5C")); // Geographic position, latitude / longitude
-													  //	serialGPS->println(F("$PUBX,40,GGA,0,0,0,0*5A"));       // Global Positioning System Fix Data
-	serialGPS->println(F("$PUBX,40,GSA,0,0,0,0*4E")); // GPS DOP and active satellites
-													  //	serialGPS->println(F("$PUBX,40,RMC,0,0,0,0*47"));       // Recommended minimum specific GPS/Transit data
-	serialGPS->println(F("$PUBX,40,GSV,0,0,0,0*59")); // GNSS satellites in view
-	serialGPS->println(F("$PUBX,40,VTG,0,0,0,0*5E")); // Track made good and ground speed
+	serialGPS->println(F("$PUBX,40,GLL,0,0,0,0*5C")); 	// Geographic position, latitude / longitude
+//	serialGPS->println(F("$PUBX,40,GGA,0,0,0,0*5A"));   // Global Positioning System Fix Data
+	serialGPS->println(F("$PUBX,40,GSA,0,0,0,0*4E")); 	// GPS DOP and active satellites
+//	serialGPS->println(F("$PUBX,40,RMC,0,0,0,0*47"));   // Recommended minimum specific GPS/Transit data
+	serialGPS->println(F("$PUBX,40,GSV,0,0,0,0*59")); 	// GNSS satellites in view
+	serialGPS->println(F("$PUBX,40,VTG,0,0,0,0*5E")); 	// Track made good and ground speed
 }
 
 /*****************************************************************
@@ -1448,20 +1501,20 @@ static void readConfigBase(bool oldconfig)
 	DeserializationError err = deserializeJson(json, configFile.readString());
 
 	debug_outln_info(F("Read JSON format.....\nJson memory size: "), String(json.memoryUsage()) + 
-					 " | Elements in array: " + String(json.size()) + 
-					 String(" | Error Code = ") + err.code() + " => " + err.f_str() );
+					 F(" | Elements in array: ") + String(json.size()) + 
+					 F(" | Error Code = ") + err.code() + F(" => ") + err.f_str() );
 
 	json_config_memory_used = String(json.memoryUsage());
 
 	configFile.seek(0);				// set file pointer back to begin file.
-	debug_outln_info(F("Read(): Config file content: ***\n"), configFile.readString() + String("\n***") );
+	debug_outln_verbose(F("Read(): Config file content: ***\n"), configFile.readString() + String("\n***") );
 	configFile.close();
 
 	if (err.code() == DeserializationError::InvalidInput)
 	{// Check Json string
 		String json_string;
 		serializeJson(json, json_string);
-		debug_outln_info(F("readConfig():Parse => [JSON] input: \n"), json_string.c_str());
+		debug_outln_verbose(F("readConfig():Parse => [JSON] input: \n"), json_string.c_str());
 
 		if (json_string.startsWith("{") && json_string.endsWith("}"))
 		{ // still a good Json format
@@ -1473,7 +1526,7 @@ static void readConfigBase(bool oldconfig)
 
 	if ( !err )
 	{
-		serializeJsonPretty(json, Debug);		// display all members + value of config file.
+		serializeJsonPretty(json, Debug);		// display all members + value of config file (send it to UART0 port).
 		debug_outln_info(F("\nparsed json...\nJson memory size: "), String(json.memoryUsage()) + String(" char."));
 
 		// "configShape" memory array[], defined in airrohr-cfg.h
@@ -1510,7 +1563,9 @@ static void readConfigBase(bool oldconfig)
 
 		String writtenVersion(json["SOFTWARE_VERSION"].as<const char *>());
 		
-		if (writtenVersion.length() && writtenVersion[0] == 'N' && SOFTWARE_VERSION != writtenVersion)
+		if (writtenVersion.length() > 0 && 
+			writtenVersion[0] == 'F' && // writtenVersion[1] == 'W' && 
+			SOFTWARE_VERSION != writtenVersion)
 		{
 			debug_outln_info(F("Rewriting old config from: "), writtenVersion);
 			// would like to do that, but this would wipe firmware.old which the two stage loader
@@ -1615,20 +1670,20 @@ static void readConfigS7000(bool oldconfig)
 	DeserializationError err = deserializeJson(json, configFile.readString());
 
 	debug_outln_info(F("Read JSON S7000 format.....\nJson memory size: "), String(json.memoryUsage()) + 
-					 " | Elementen in array: " + String(json.size()) + 
-					 String(" | Error Code = ") + err.code() + " => " + err.f_str() );
+					 F(" | Elementen in array: ") + String(json.size()) + 
+					 F(" | Error Code = ") + err.code() + F(" => ") + err.f_str() );
 
 	json_config7000_memory_used = String(json.memoryUsage());
 
 	configFile.seek(0);				// set file pointer back to begin file.
-	debug_outln_info(F("Read(): Config file content: ***\n"), configFile.readString() + String("\n***") );
+	debug_outln_verbose(F("Read(): Config file content: ***\n"), configFile.readString() + String("\n***") );
 	configFile.close();
 
 	if (err.code() == DeserializationError::InvalidInput)
 	{// Check Json string
 		String json_string;
 		serializeJson(json, json_string);
-		debug_outln_info(F("readConfig():Parse => [JSON] input: \n"), json_string.c_str());
+		debug_outln_verbose(F("readConfig():Parse => [JSON] input: \n"), json_string.c_str());
 
 		if (json_string.startsWith("{") && json_string.endsWith("}"))
 		{ // still a good Json format
@@ -1720,19 +1775,38 @@ static void init_config()
 
 	debug_outln_info(F("mounting FS done, read config values."));
 
-	FSInfo fs_info;
-	SPIFFS.info(fs_info);
+	readConfig();
 
-	debug_outln_info(F("fs_info.totalBytes = "), String(fs_info.totalBytes));
-	debug_outln_info(F("fs_info.usedBytes = "), String(fs_info.usedBytes));
-	debug_outln_info(F("fs_info.blockSize = "), String(fs_info.blockSize));
-	debug_outln_info(F("fs_info.pageSize = "), String(fs_info.pageSize));
-	debug_outln_info(F("fs_info.maxOpenFiles = "), String(fs_info.maxOpenFiles));
-	debug_outln_info(F("fs_info.maxPathLength = "), String(fs_info.maxPathLength));
+	if (cfg::debug >= DEBUG_MAX_INFO)
+	{
+		debug_outln_info(F("file system, files:"));
+
+		fs::FSInfo fs_info;
+		SPIFFS.info(fs_info);
+
+		debug_outln_info(F("\t\tfs_info.totalBytes = "), String(fs_info.totalBytes));
+		debug_outln_info(F("\t\tfs_info.usedBytes = "), String(fs_info.usedBytes));
+		debug_outln_info(F("\t\tfs_info.blockSize = "), String(fs_info.blockSize));
+		debug_outln_info(F("\t\tfs_info.pageSize = "), String(fs_info.pageSize));
+		debug_outln_info(F("\t\tfs_info.maxOpenFiles = "), String(fs_info.maxOpenFiles));
+		debug_outln_info(F("\t\tfs_info.maxPathLength = "), String(fs_info.maxPathLength));
+
+		debug_outln_info(F("\nSPIFFS root directory list:"));
+
+		String fileName;
+		fs::Dir dir = SPIFFS.openDir(F("/"));
+		while(dir.next())
+		{
+			fileName = F("\t\tName: ") + dir.fileName() + F(" | Size: ") + String(dir.fileSize());
+			debug_outln_info(fileName);
+		}
+
+		// debug_outln_info(F("Total Free Sketch/Program Space = "), String(ESP.getSketchSize() + ESP.getFreeSketchSpace()));
+		Debug.printf( "Sketch Size=%u Free Sketch Space=%u total Sketch Space=%u\r\n", ESP.getSketchSize(), ESP.getFreeSketchSpace(), (ESP.getSketchSize() + ESP.getFreeSketchSpace()));
+	}
 
 #pragma GCC diagnostic pop
 
-	readConfig();
 }
 
 
@@ -1908,10 +1982,10 @@ static void createLoggerConfigs()
 
 	if (cfg::send2dusti)
 	{
-		loggerConfigs[LoggerSensorCommunity].destport = 80;
+		loggerConfigs[LoggerSensorCommunity].destport = PORT_SENSORCOMMUNITY;	// http:
 		if (cfg::ssl_dusti)
-		{
-			loggerConfigs[LoggerSensorCommunity].destport = 443;
+		{// use by: sensor.community and opensensmap
+			loggerConfigs[LoggerSensorCommunity].destport = PORT_SENSEMAP;		// https:
 			loggerConfigs[LoggerSensorCommunity].session = new_session();
 		}
 	}
@@ -1919,7 +1993,7 @@ static void createLoggerConfigs()
 	loggerConfigs[LoggerMadavi].destport = PORT_MADAVI;
 	if (cfg::send2madavi && cfg::ssl_madavi)
 	{
-		loggerConfigs[LoggerMadavi].destport = 443;
+		loggerConfigs[LoggerMadavi].destport = PORT_SENSEMAP;
 		loggerConfigs[LoggerMadavi].session = new_session();
 	}
 
@@ -2119,7 +2193,7 @@ static String form_submit(const String &value)
 }
 
 // Disable Firmware opties (FvD)
-/*
+
 static String form_select_lang()
 {
 	String s_select = F(" selected='selected'");
@@ -2127,33 +2201,33 @@ static String form_select_lang()
 				 "<td>" INTL_LANGUAGE ":&nbsp;</td>"
 				 "<td>"
 				 "<select id='current_lang' name='current_lang'>"
-				 "<option value='BG'>Bulgarian (BG)</option>"
-				 "<option value='CN'>中文 (CN)</option>"
-				 "<option value='CZ'>Český (CZ)</option>"
-				 "<option value='DE'>Deutsch (DE)</option>"
-				 "<option value='DK'>Dansk (DK)</option>"
-				 "<option value='EE'>Eesti keel (EE)</option>"
-				 "<option value='EN'>English (EN)</option>"
-				 "<option value='ES'>Español (ES)</option>"
-				 "<option value='FR'>Français (FR)</option>"
-				 "<option value='GR'>Ελληνικά (GR)</option>"
-				 "<option value='IT'>Italiano (IT)</option>"
-				 "<option value='JP'>日本語 (JP)</option>"
-				 "<option value='LT'>Lietuvių kalba (LT)</option>"
-				 "<option value='LU'>Lëtzebuergesch (LU)</option>"
-				 "<option value='LV'>Latviešu valoda (LV)</option>"
-				 "<option value='NL'>Nederlands (NL)</option>"
-				 "<option value='HU'>Magyar (HU)</option>"
-				 "<option value='PL'>Polski (PL)</option>"
-				 "<option value='PT'>Português (PT)</option>"
-				 "<option value='RO'>Română (RO)</option>"
-				 "<option value='RS'>Srpski (RS)</option>"
-				 "<option value='RU'>Русский (RU)</option>"
-				 "<option value='SI'>Slovenščina (SI)</option>"
-				 "<option value='SK'>Slovák (SK)</option>"
-				 "<option value='SE'>Svenska (SE)</option>"
-				 "<option value='TR'>Türkçe (TR)</option>"
-				 "<option value='UA'>український (UA)</option>"
+				//  "<option value='BG'>Bulgarian (BG)</option>"
+				//  "<option value='CN'>中文 (CN)</option>"
+				//  "<option value='CZ'>Český (CZ)</option>"
+				    "<option value='DE'>Deutsch (DE)</option>"
+				//  "<option value='DK'>Dansk (DK)</option>"
+				//  "<option value='EE'>Eesti keel (EE)</option>"
+					"<option value='EN'>English (EN)</option>"
+				//  "<option value='ES'>Español (ES)</option>"
+				    "<option value='FR'>Français (FR)</option>"
+				//  "<option value='GR'>Ελληνικά (GR)</option>"
+				//  "<option value='IT'>Italiano (IT)</option>"
+				//  "<option value='JP'>日本語 (JP)</option>"
+				//  "<option value='LT'>Lietuvių kalba (LT)</option>"
+				//  "<option value='LU'>Lëtzebuergesch (LU)</option>"
+				//  "<option value='LV'>Latviešu valoda (LV)</option>"
+				    "<option value='NL'>Nederlands (NL)</option>"
+				//  "<option value='HU'>Magyar (HU)</option>"
+				//  "<option value='PL'>Polski (PL)</option>"
+				//  "<option value='PT'>Português (PT)</option>"
+				//  "<option value='RO'>Română (RO)</option>"
+				//  "<option value='RS'>Srpski (RS)</option>"
+				//  "<option value='RU'>Русский (RU)</option>"
+				//  "<option value='SI'>Slovenščina (SI)</option>"
+				//  "<option value='SK'>Slovák (SK)</option>"
+				//  "<option value='SE'>Svenska (SE)</option>"
+				//  "<option value='TR'>Türkçe (TR)</option>"
+				//  "<option value='UA'>український (UA)</option>"
 				 "</select>"
 				 "</td>"
 				 "</tr>");
@@ -2161,7 +2235,7 @@ static String form_select_lang()
 	s.replace("'" + String(cfg::current_lang) + "'>", "'" + String(cfg::current_lang) + "'" + s_select + ">");
 	return s;
 }
-*/
+
 
 /*
   Input:
@@ -2281,7 +2355,8 @@ static void webserver_root()
 		page_content.replace(F("{s7000}"), FPSTR(INTL_SIM7000_CONFIGURATION));
 		page_content.replace(F("{restart}"), FPSTR(INTL_RESTART_SENSOR));
 		page_content.replace(F("{debug}"), FPSTR(INTL_DEBUG_LEVEL));
-		
+		page_content.replace(F("{update}"), FPSTR(INTL_UPDATE_FIRMWARE));
+
 		end_html_page(page_content);
 	}
 }
@@ -2321,7 +2396,7 @@ static void webserver_config_send_body_get(String &page_content)
 					  "<div class='panel' id='panel1'>");
 
 	if (wificonfig_loop)
-	{ // scan for wlan ssids
+	{ // scan for wlan ssid's
 		page_content += F("<div id='wifilist'>" INTL_WIFI_NETWORKS "</div><br/>");
 	}
 
@@ -2375,16 +2450,12 @@ static void webserver_config_send_body_get(String &page_content)
 		server.sendContent(page_content);
 	}
 
-	// Add IP static (FVD)
-	// add checkbox
-
 	page_content = FPSTR(WEB_BR_LF);
 	page_content += F("<hr/>");
-	page_content += FPSTR(WEB_BR_LF);
+	//page_content += FPSTR(WEB_BR_LF);
 	add_form_checkbox(Config_has_s7000, FPSTR(INTL_ENABLE_S7000));
 	page_content += FPSTR(WEB_BR_LF);
 	add_form_checkbox(Config_has_radarmotion, FPSTR(INTL_ENABLE_RCWL_0516));
-	//page_content += FPSTR(WEB_BR_LF_B);
 
 	if (cfg::has_radarmotion)
 	{
@@ -2400,6 +2471,8 @@ static void webserver_config_send_body_get(String &page_content)
 	page_content += FPSTR(WEB_BR_LF_B);
 	page_content += F("<hr/>");
 
+	// Add IP static (FVD)
+	// add checkbox
 	add_form_checkbox(Config_has_fix_ip, FPSTR(INTL_STATIC_IP_TEXT));
 	page_content += FPSTR(TABLE_TAG_OPEN);
 
@@ -2428,17 +2501,32 @@ static void webserver_config_send_body_get(String &page_content)
 	add_form_checkbox(Config_has_lcd2004, FPSTR(INTL_LCD2004_3F));
 	add_form_checkbox(Config_display_wifi_info, FPSTR(INTL_DISPLAY_WIFI_INFO));
 	add_form_checkbox(Config_display_device_info, FPSTR(INTL_DISPLAY_DEVICE_INFO));
-	page_content += FPSTR(WEB_BR_LF);
-
+	//page_content += FPSTR(WEB_BR_LF);
 	server.sendContent(page_content);
-	page_content = FPSTR(WEB_BR_LF);
 
+	page_content = FPSTR(WEB_BR_LF);
 	page_content += F("<hr/>");
 	page_content += FPSTR(INTL_AB_HIER_NUR_ANDERN);
 	page_content += FPSTR(WEB_B_BR);
+	page_content += FPSTR(WEB_BR_LF);
+
+	page_content += FPSTR(TABLE_TAG_OPEN);
+	page_content += form_select_lang();
+
+	page_content += F("<script>"
+					  "var $ = function(e) { return document.getElementById(e); };"
+					  "function updateOTAOptions() { "
+					  "$('current_lang').disabled = $('use_beta').disabled = !$('auto_update').checked; "
+					  "}; updateOTAOptions(); $('auto_update').onchange = updateOTAOptions;"
+					  "</script>");
+	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
+
+	page_content += FPSTR(WEB_BR_LF);
+	add_form_checkbox(Config_auto_update, FPSTR(INTL_AUTO_UPDATE));
 	page_content += FPSTR(BR_TAG);
 
 	add_form_checkbox(Config_powersave, FPSTR(INTL_POWERSAVE));
+	page_content += FPSTR(WEB_BR_LF);
 	page_content += FPSTR(TABLE_TAG_OPEN);
 	add_form_input(page_content, Config_debug, FPSTR(INTL_DEBUG_LEVEL), 1);
 	add_form_input(page_content, Config_sending_intervall_ms, FPSTR(INTL_MEASUREMENT_INTERVAL), 5);
@@ -2456,6 +2544,11 @@ static void webserver_config_send_body_get(String &page_content)
 
 	page_content += form_select_mode_SEN5PM();
 	page_content += form_select_mode_SEN5TH();
+
+	page_content += FPSTR(INTL_SENSORCOMMUNITY);
+	page_content += FPSTR(WEB_BR_LF);
+	add_form_checkbox_sensor(Config_sen5x_pin16, FPSTR(INTL_SEN5X_PIN16));
+	//page_content += form_select_mode_SEN5_scomm();
 
 	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
 	page_content += F("<hr/>");
@@ -2868,9 +2961,14 @@ static void webserver_config7()
 		}
 	}
 }
-/*
 
-*/
+/// @brief 
+/// sensor will be restart after:
+///			- some time
+///			- Exception Error
+///			- by Software / Hardware watchdog.
+///			- By new firmware loading by OTA.
+///
 static void sensor_restart()
 {
 #if defined(ESP8266)
@@ -2913,9 +3011,46 @@ static void sensor_restart()
 }
 
 /*****************************************************************
- * Webserver wifi: show available wifi networks                  *
+ * Webserver Update Firmware: input file extern server           *
  *****************************************************************/
-static void webserver_wifi()
+static void webserver_firmware_update()
+{
+	if (!webserver_request_auth())
+	{
+		return;
+	}
+
+	//String page_content;
+	//page_content.reserve(512);
+	// same result
+	RESERVE_STRING(page_content, 512);
+
+	debug_outln_info(F("ws: firmware Update page..."));
+
+	start_html_page(page_content, FPSTR(INTL_UPDATE_FIRMWARE));
+
+	if (server.method() == HTTP_GET)
+	{
+		debug_outln_verbose(F("webserver_firmware_update(): HTTP GET: "), String(FPSTR(FW_DOWNLOAD_HOST)) + ':' + String(FW_DOWNLOAD_PORT) + String(FW_DOWNLOAD_URL));
+
+		// Send Firmware webpage to clinet web browser.
+		page_content += FPSTR(WEB_UPDATE_FIRMWARE);
+	}
+	else
+	{
+		debug_outln_verbose(F("webserver_firmware_update(): HTTP POST: "), F("start OTA process on main loop()."));
+
+		// start OTA process on main loop().
+		flg_OTAStartbyWebCall = true;
+	}
+
+	end_html_page(page_content);
+}
+
+/*****************************************************************
+*  Webserver wifi: show available wifi networks                  *
+*****************************************************************/
+	static void webserver_wifi()
 {
 	String page_content;
 
@@ -3038,7 +3173,7 @@ static void webserver_values()
 
 	auto add_table_t_value = [&page_content](const __FlashStringHelper *sensor, const __FlashStringHelper *param, const float value)
 	{
-		add_table_row_from_value(page_content, sensor, param, check_display_value(value, -128, 1, 0), "°C");
+		add_table_row_from_value(page_content, sensor, param, check_display_value(value, -128, 2, 0), "°C");
 	};
 
 	auto add_table_h_value = [&page_content](const __FlashStringHelper *sensor, const __FlashStringHelper *param, const float value)
@@ -3116,43 +3251,42 @@ static void webserver_values()
 
 	if (cfg::sen5x_read)
 	{
-		// Debug.println((char*)SEN5X_type);
-		// Debug.println(memcmp(SEN5X_type,"SEN50",6));
+		// if (memcmp(SEN5X_type, SENSOR_SEN50, 6) == 0)
+		// {
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM1), last_value_SEN5X_P0);
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM25), last_value_SEN5X_P2);
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM4), last_value_SEN5X_P4);
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM10), last_value_SEN5X_P1);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC0k5), last_value_SEN5X_N05);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC1k0), last_value_SEN5X_N1);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC2k5), last_value_SEN5X_N25);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC4k0), last_value_SEN5X_N4);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC10), last_value_SEN5X_N10);
+		// 	add_table_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_TPS), check_display_value(last_value_SEN5X_TS, -1, 1, 0), "µm");
+		// 	page_content += FPSTR(EMPTY_ROW);
+		// }
 
-		if (memcmp(SEN5X_type, "SEN50", 6) == 0)
-		{
-			add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM1), last_value_SEN5X_P0);
-			add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM25), last_value_SEN5X_P2);
-			add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM4), last_value_SEN5X_P4);
-			add_table_pm_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_PM10), last_value_SEN5X_P1);
-			add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC0k5), last_value_SEN5X_N05);
-			add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC1k0), last_value_SEN5X_N1);
-			add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC2k5), last_value_SEN5X_N25);
-			add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC4k0), last_value_SEN5X_N4);
-			add_table_nc_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_NC10), last_value_SEN5X_N10);
-			add_table_value(FPSTR(SENSORS_SEN50), FPSTR(WEB_TPS), check_display_value(last_value_SEN5X_TS, -1, 1, 0), "µm");
-			page_content += FPSTR(EMPTY_ROW);
-		}
+		// if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+		// {
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM1), last_value_SEN5X_P0);
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM25), last_value_SEN5X_P2);
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM4), last_value_SEN5X_P4);
+		// 	add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM10), last_value_SEN5X_P1);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC0k5), last_value_SEN5X_N05);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC1k0), last_value_SEN5X_N1);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC2k5), last_value_SEN5X_N25);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC4k0), last_value_SEN5X_N4);
+		// 	add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC10), last_value_SEN5X_N10);
+		// 	add_table_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_TPS), check_display_value(last_value_SEN5X_TS, -1, 1, 0), "µm");
+		// 	page_content += FPSTR(EMPTY_ROW);
+		// 	add_table_t_value(FPSTR(SENSORS_SEN54), FPSTR(INTL_TEMPERATURE), last_value_SEN5X_T);
+		// 	add_table_h_value(FPSTR(SENSORS_SEN54), FPSTR(INTL_HUMIDITY), last_value_SEN5X_H);
+		// 	page_content += FPSTR(EMPTY_ROW);
+		// 	add_table_value(FPSTR(SENSORS_SEN54), FPSTR(INTL_VOC), check_display_value(last_value_SEN5X_VOC, -1.0, 2, 0), "(index)");
+		// 	page_content += FPSTR(EMPTY_ROW);
+		// }
 
-		if (memcmp(SEN5X_type, "SEN54", 6) == 0)
-		{
-			add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM1), last_value_SEN5X_P0);
-			add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM25), last_value_SEN5X_P2);
-			add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM4), last_value_SEN5X_P4);
-			add_table_pm_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_PM10), last_value_SEN5X_P1);
-			add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC0k5), last_value_SEN5X_N05);
-			add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC1k0), last_value_SEN5X_N1);
-			add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC2k5), last_value_SEN5X_N25);
-			add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC4k0), last_value_SEN5X_N4);
-			add_table_nc_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_NC10), last_value_SEN5X_N10);
-			add_table_value(FPSTR(SENSORS_SEN54), FPSTR(WEB_TPS), check_display_value(last_value_SEN5X_TS, -1, 1, 0), "µm");
-			add_table_t_value(FPSTR(SENSORS_SEN54), FPSTR(INTL_TEMPERATURE), last_value_SEN5X_T);
-			add_table_h_value(FPSTR(SENSORS_SEN54), FPSTR(INTL_HUMIDITY), last_value_SEN5X_H);
-			add_table_value(FPSTR(SENSORS_SEN54), FPSTR(INTL_VOC), check_display_value(last_value_SEN5X_VOC, 0, 0, 0), "(index)");
-			page_content += FPSTR(EMPTY_ROW);
-		}
-
-		if (memcmp(SEN5X_type, "SEN55", 6) == 0)
+		if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
 		{
 			add_table_pm_value(FPSTR(SENSORS_SEN55), FPSTR(WEB_PM1), last_value_SEN5X_P0);
 			add_table_pm_value(FPSTR(SENSORS_SEN55), FPSTR(WEB_PM25), last_value_SEN5X_P2);
@@ -3164,10 +3298,12 @@ static void webserver_values()
 			add_table_nc_value(FPSTR(SENSORS_SEN55), FPSTR(WEB_NC4k0), last_value_SEN5X_N4);
 			add_table_nc_value(FPSTR(SENSORS_SEN55), FPSTR(WEB_NC10), last_value_SEN5X_N10);
 			add_table_value(FPSTR(SENSORS_SEN55), FPSTR(WEB_TPS), check_display_value(last_value_SEN5X_TS, -1, 1, 0), "µm");
+			page_content += FPSTR(EMPTY_ROW);
 			add_table_t_value(FPSTR(SENSORS_SEN55), FPSTR(INTL_TEMPERATURE), last_value_SEN5X_T);
 			add_table_h_value(FPSTR(SENSORS_SEN55), FPSTR(INTL_HUMIDITY), last_value_SEN5X_H);
-			add_table_value(FPSTR(SENSORS_SEN55), FPSTR(INTL_VOC), check_display_value(last_value_SEN5X_VOC, 0, 0, 0), "(index)");
-			add_table_value(FPSTR(SENSORS_SEN55), FPSTR(INTL_NOX), check_display_value(last_value_SEN5X_NOX, 0, 0, 0), "ppm");
+			page_content += FPSTR(EMPTY_ROW);
+			add_table_value(FPSTR(SENSORS_SEN55), FPSTR(INTL_VOC), check_display_value(last_value_SEN5X_VOC, -1.0, 2, 0), "(index)");
+			add_table_value(FPSTR(SENSORS_SEN55), FPSTR(INTL_NOX), check_display_value(last_value_SEN5X_NOX, -1.0, 2, 0), "ppm");
 			page_content += FPSTR(EMPTY_ROW);
 		}
 	}
@@ -3418,6 +3554,31 @@ static void webserver_status()
 		//add_table_row_from_value(page_content, F("CO₂ offset"), String( settingVal) + String(" ppm"));
 	}
 
+	if (cfg::sen5x_read)
+	{// Display Sen5x settings.
+		// if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+		// {
+		// 	//String manufacturer = F("Sensirion ") + String(SENSORS_SEN54);
+		// 	add_table_row_from_value(page_content, FPSTR((String(MANUFACTURER) + String(SENSORS_SEN54)).c_str()), emptyString);
+		// }
+		// else
+		{
+			//String manufacturer = F("Sensirion ") + String(SENSORS_SEN55);
+			add_table_row_from_value(page_content, FPSTR((String(MANUFACTURER) + String(SENSORS_SEN55)).c_str()), emptyString);
+		}
+
+		float offsetTemp;
+		sen5x.getTemperatureOffsetSimple(offsetTemp);
+		versionHtml = F("Temperature offset: ");
+		versionHtml += String(offsetTemp,1) + String("°C");
+		versionHtml += String( BR_TAG);
+		versionHtml += FPSTR(INTL_SEN5X_ON);
+		versionHtml += cfg::sen5x_on == true ? F(": enabled") : F(": disabled");
+		//versionHtml += String( BR_TAG);
+
+		add_table_row_from_value(page_content, FPSTR(emptyString.c_str()), versionHtml);
+	}
+
 	page_content += FPSTR(EMPTY_ROW);
 	page_content += F("<tr><td colspan='2'><b>" INTL_ERROR "</b></td></tr>");
 
@@ -3468,18 +3629,17 @@ static void webserver_status()
 	}
 
 	if (cfg::sen5x_read)
-	{
-		if(memcmp(SEN5X_type,"SEN50",6) == 0)
-		{
-			add_table_row_from_value(page_content, FPSTR(SENSORS_SEN50), String(SEN5X_read_error_counter));
-		}
-
-		if(memcmp(SEN5X_type,"SEN54",6)== 0)
-		{
-			add_table_row_from_value(page_content, FPSTR(SENSORS_SEN54), String(SEN5X_read_error_counter));
-		}
-
-		if(memcmp(SEN5X_type,"SEN55",6)== 0)
+	{// display SEN5x reading Errors.
+		// if(memcmp(SEN5X_type, SENSOR_SEN50,6) == 0)
+		// {
+		// 	add_table_row_from_value(page_content, FPSTR(SENSORS_SEN50), String(SEN5X_read_error_counter));
+		// }
+		// else if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+		// {
+		// 	add_table_row_from_value(page_content, FPSTR(SENSORS_SEN54), String(SEN5X_read_error_counter));
+		// }
+		// else 
+		if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
 		{
 			add_table_row_from_value(page_content, FPSTR(SENSORS_SEN55), String(SEN5X_read_error_counter));
 		}
@@ -3837,6 +3997,7 @@ static void setup_webserver()
 	server.on(F("/generate_204"), webserver_config);
 	server.on(F("/fwlink"), webserver_config);
 	server.on(F("/debug"), webserver_debug_level);
+	server.on(F("/update"), webserver_firmware_update);
 	server.on(F("/serial"), webserver_serial);
 	server.on(F("/removeConfig"), webserver_removeConfig);
 	server.on(F("/reset"), webserver_reset);
@@ -3853,14 +4014,17 @@ static void setup_webserver()
 	server.begin();
 }
 
-/*
-	Set Up connection to a MQTT broker.
-	like Mosquitto.
-*/
+/// @brief
+///
+///	Set Up connection to a MQTT broker.
+///	like Mosquitto.
+///
+/// @param host 
+/// @param port 
 static void setup_mqtt_broker(const char *host, const int port)
 {
 #if defined(ESP8266)
-	if (cfg::send2mqtt && !mqtt_client.connected())
+	if ( !mqtt_client.connected())
 	{
 		debug_outln_info(F("\n** Start Initialize MQTT Broker connection **"));
 
@@ -3876,6 +4040,7 @@ static void setup_mqtt_broker(const char *host, const int port)
 		// -- Set-Up Topic header for MQTT Broker
 
 		mqtt_client.setServer(host, port);
+		//mqtt_client.setCallback(mqttCallback);				// setup callback method.
 
 		String mess_off = INTL_OFFLINE;
 
@@ -3894,12 +4059,12 @@ static void setup_mqtt_broker(const char *host, const int port)
 					break;
 				}
 
-				debug_outln_info(F("** Not connected to MQTT Broker, wait ** state: "), String(mqtt_client.state()));
+				debug_outln_verbose(F("Not connected to MQTT Broker, wait state: "), String(mqtt_client.state()));
 				delay(500);
 			}
 
-			debug_outln_info(F("KeepAlive  - "), String(keepAlive) + F(" sec."));
-			debug_outln_info(F("** MQTT Broker connected ** C_flag: "), String(mqtt_client.connected()));
+			debug_outln_verbose(F("KeepAlive  - "), String(keepAlive) + F(" sec."));
+			debug_outln_info(F("MQTT Broker connected, C_flag: "), String(mqtt_client.connected()));
 		}
 		else
 		{
@@ -3908,10 +4073,30 @@ static void setup_mqtt_broker(const char *host, const int port)
 	}
 #endif
 }
-/*
-	select Channel For App.
-	return channel nr: 1 or 6 or 11
-*/
+
+/************************************************************************************
+ *	MQTT Callback methode.															*
+ *																					*
+ *	only for test, maybe FFU														*
+*************************************************************************************/
+// void mqttCallback(char *topic, uint8_t *payload, unsigned int len)
+// {
+// 	String topicmesg = String(mqtt_header) + String("/radar");
+// 	if (String(topic) == topicmesg)
+// 	{
+// 		debug_outln_info(F("MQTT Callback: Message arrived ["));
+// 		debug_out(String(topic),DEBUG_MIN_INFO);
+// 		debug_out(F("]:\npayload: "),DEBUG_MIN_INFO);
+// 		Debug.write(payload, len);
+// 		debug_out(F(" ,payload lenght: "),DEBUG_MIN_INFO);
+// 		debug_outln_info(String(len));
+// 	}
+// }
+
+/************************************************************************************
+ *	select Channel For App.															*
+ *	return channel nr: 1 or 6 or 11													*
+*************************************************************************************/
 static int selectChannelForAp()
 {
 	std::array<int, 14> channels_rssi;
@@ -4163,9 +4348,9 @@ static void waitForMultiWiFiToConnect(int maxRetries, uint16_t connectTimeOutPer
 ******************************************************************/
 static void RegisterMultiWiFiNetworks(int maxRetries)
 {
-	uint16_t connectTimeOutPerAP = WIFI_CONNECT_TIMEOUT_MS; // Defines the TimeOut(ms) which will be used to try and connect with any specific Access Point.
+	uint16_t connectTimeOutPerAP = WIFI_CONNECT_TIMEOUT_MS; 	// Defines the TimeOut(ms) which will be used to try and connect with any specific Access Point.
 
-	wifiMulti.addAP(cfg::wlanssid, cfg::wlanpwd); 			// Open/Start WiFI coonection to router/modem. (default: WiFi Network 1)
+	wifiMulti.addAP(cfg::wlanssid, cfg::wlanpwd); 				// Open/Start WiFI coonection to router/modem. (default: WiFi Network 1)
 
 	if (cfg::has_morewifi)
 	{
@@ -4174,14 +4359,14 @@ static void RegisterMultiWiFiNetworks(int maxRetries)
 		if (strlen(cfg::wlanpwd_2) != 0)
 		{
 			wifiMulti.addAP(cfg::wlanssid_2, cfg::wlanpwd_2);
-			//connectTimeOutPerAP = WIFI_CONNECT_TIMEOUT_MS;
+			connectTimeOutPerAP = 2 * WIFI_SCAN_TIMEOUT_MS;		// needs this time out value for slow and/or bad wifi signal
 			debug_outln_info(F("Set WiFi Network 2."));
 		}
 
 		if (strlen(cfg::wlanpwd_3) != 0)
 		{
 			wifiMulti.addAP(cfg::wlanssid_3, cfg::wlanpwd_3);
-			//connectTimeOutPerAP = WIFI_CONNECT_TIMEOUT_MS;
+			connectTimeOutPerAP = 4 * WIFI_SCAN_TIMEOUT_MS;		// needs this time out value for slow and/or bad wifi signal
 			debug_outln_info(F("Set WiFi Network 3."));
 		}
 	}
@@ -4372,9 +4557,6 @@ static WiFiClient *getNewLoggerWiFiClient(const LoggerEntry logger)
 	NOTE: Software serial is not reliable on 115200 baud and therefore changes it to a lower value. 
 		  9600 works well in almost all applications, but 115200 works great with Hardware serial.
 */
-#define LTEMODEM_BAUD	9600
-#define SERIALSIM_BAUD	115200
-
 static boolean SIM700LTEConnect() 
 {
 	debug_outln_info(F("SIM700 Connecting to "), String(cfg::wlanssid));	// ???
@@ -4487,7 +4669,7 @@ static unsigned long sendData(const LoggerEntry logger, const String &data, cons
 			debug_outln_info(F("Succeeded - "), s_Host);
 			send_success = true;
 		}
-		else if (result >= HTTP_CODE_BAD_REQUEST)
+		else //if (result >= HTTP_CODE_BAD_REQUEST)
 		{
 			debug_outln_info(F("Request failed with error: "), String(result));
 			debug_outln_info(F("Details:"), http.getString());
@@ -4531,21 +4713,19 @@ static unsigned long sendSensorCommunity(const String &data, const int pin, cons
 
 		sum_send_time = sendData(LoggerSensorCommunity, data_sensorcommunity, pin, HOST_SENSORCOMMUNITY, URL_SENSORCOMMUNITY);
 
-		debug_outln_info( F("SensorCommunity data: "), data_sensorcommunity);
+		debug_outln_verbose( F("Sensor.Community data:\n"), data_sensorcommunity);
 	}
 
 	return sum_send_time;
 }
 
 /*****************************************************************
- * send data to mqtt api                                         *
- * return: total working/send time.								 *
+ * send densor data to mqtt Broker.                              *
+ * 																 *
 /*****************************************************************/
-static unsigned long sendmqtt(const String &data)
+static void sendmqtt(const String &data)
 {
 #if defined(ESP8266)
-
-	starttime_MQTT = millis();
 
 	if ( !mqtt_client.connected())
 	{// after x time MQTT connection will be lost wifi connection.... but why ????
@@ -4570,6 +4750,11 @@ static unsigned long sendmqtt(const String &data)
 				key = measurement["value_type"].as<const char *>();
 				val = measurement["value"].as<const char *>();
 
+				if( key.startsWith(F("SEN5X_co2")))
+				{
+					key.replace(F("_co2_ppm"), F("_NOx"));
+				}
+
 				int spc = val.indexOf(' ');
 
 				if (spc >= 0)
@@ -4579,28 +4764,26 @@ static unsigned long sendmqtt(const String &data)
 
 				// Format mqtt message
 				payload += "\"" + key + "\":\"" + val + "\",";
-				//payload += "\"sensor\":\"" + key + "\",\"value\":" + val + ",";
-
 			}
 
 			header = mqtt_header;
 			header += "/sensor";
 
 			payload.remove(payload.length() - 1, 1);	// delete last char ','.
-			payload += "}";								// set end char. Json format
+			payload += "}";								// set end char. Json format.
 
-			debug_outln_info(F("\npublishing To MQTT Broker = ... "));
+			debug_outln_info(F("\npublish a message To MQTT Broker = ... "));
 			debug_outln_info(F("- topic = "), (String &)header);
-			debug_outln_info(F("- payload = "), (String &)payload);
+			debug_outln_verbose(F("- payload = "), (String &)payload);
 
 			if (mqtt_client.publish(header.c_str(), payload.c_str()))
 			{
-				debug_outln_info(F("payload send ok..."));
+				debug_outln_info(F("Sensor send ok..."));
 				mqtt_error = "ok";
 			}
 			else
 			{
-				debug_outln_info(F("payload send failed..."));
+				debug_outln_info(F("Sensor send failed..."));
 				mqtt_error = "failed";
 			}
 
@@ -4624,7 +4807,7 @@ static unsigned long sendmqtt(const String &data)
 			payload_status += "\":\"" + mqtt_error + "\"}";
 
 			debug_outln_info(F("- status topic = "), (String &)status_header);
-			debug_outln_info(F("- status payload = "), (String &)payload_status);
+			debug_outln_verbose(F("- status payload = "), (String &)payload_status);
 
 			if(mqtt_client.publish(status_header.c_str(), payload_status.c_str()))
 			{
@@ -4638,24 +4821,23 @@ static unsigned long sendmqtt(const String &data)
 			}
 
 			// default LWT online
-			//debug_outln_info(F("Send online LWT"));
 			debug_outln_info(F("- LWT topic = "), mqtt_lwt_header);
 
 			String payload_mess_on = INTL_ONLINE;
 			if( mqtt_client.publish(mqtt_lwt_header, payload_mess_on.c_str()))
 			{
-				debug_outln_info(F("lwt send ok..."));
+				debug_outln_verbose(F("- LWT payload = "), (String &)payload_mess_on);
+				debug_outln_info(F("LWT send ok..."));
 				//mqtt_error = "ok";
 			}
 			else
 			{
-				debug_outln_info(F("lwt send failed..."));
+				debug_outln_info(F("LWT send failed..."));
 				//mqtt_error = "failed";
 			}
 		}
 	}
 
-	return micros() - starttime_MQTT;
 #endif
 }
 
@@ -6004,29 +6186,31 @@ static void fetchSensorIPS(String &s)
 }
 
 /*****************************************************************
-   read SEN5X PM sensor values
-
-   Send NOx value to outside
+ *  read SEN5X PM sensor values
+ *
+ *  Send NOx value to outside
  *****************************************************************/
 static void fetchSensorSEN5X(String &s)
 {
-	String result_SEN5X = emptyString;
+	//String result_SEN5X = emptyString;
+	RESERVE_STRING(result_SEN5X, 10);
+	result_SEN5X = F("SEN55_");
 
-	if (memcmp(SEN5X_type, "SEN50", 6) == 0)
-	{
-		result_SEN5X = F("SEN50_");
-		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN50));
-	}
+	// if (memcmp(SEN5X_type, SENSOR_SEN50, 6) == 0)
+	// {
+	// 	//result_SEN5X = F("SEN50_");
+	// 	debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN50));
+	// }
 
-	if (memcmp(SEN5X_type, "SEN54", 6) == 0)
-	{
-		result_SEN5X = F("SEN54_");
-		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN54));
-	}
+	// if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+	// {
+	// 	//result_SEN5X = F("SEN54_");
+	// 	debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN54));
+	// }
 
-	if (memcmp(SEN5X_type, "SEN55", 6) == 0)
+	if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
 	{
-		result_SEN5X = F("SEN55_");
+		//result_SEN5X = F("SEN55_");
 		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN55));
 	}
 
@@ -6041,8 +6225,6 @@ static void fetchSensorSEN5X(String &s)
 	last_value_SEN5X_N10 = value_SEN5X_N10 / SEN5X_measurement_count;
 	last_value_SEN5X_TS = value_SEN5X_TS / SEN5X_measurement_count;
 
-	last_value_SEN5X_VOC = value_SEN5X_VOC / SEN5X_measurement_count;
-
 	debug_outln_info(FPSTR(DBG_TXT_SEP));
 
 	add_Value2Json(s, FPSTR((result_SEN5X + F("P0")).c_str()),  F("PM1.0: "), last_value_SEN5X_P0);
@@ -6053,26 +6235,8 @@ static void fetchSensorSEN5X(String &s)
 	add_Value2Json(s, FPSTR((result_SEN5X + F("N1")).c_str()),  F("NC1.0: "), last_value_SEN5X_N1);
 	add_Value2Json(s, FPSTR((result_SEN5X + F("N25")).c_str()), F("NC2.5: "), last_value_SEN5X_N25);
 	add_Value2Json(s, FPSTR((result_SEN5X + F("N4")).c_str()),  F("NC4.0: "), last_value_SEN5X_N4);
-	add_Value2Json(s, FPSTR((result_SEN5X + F("N10")).c_str()), F("NC10:  "), last_value_SEN5X_N10);
-	add_Value2Json(s, FPSTR((result_SEN5X + F("TS")).c_str()),  F("TPS:   "), last_value_SEN5X_TS);
-
-	// For test fase split sensor data in two sections (PM and temp) moved to fetchSensorSEN5X_HT().
-	// if (memcmp(SEN5X_type, "SEN50", 6) != 0)
-	// {
-	// 	add_Value2Json(s, FPSTR((result_SEN5X + F("temperature")).c_str()), FPSTR(DBG_TXT_TEMPERATURE), last_value_SEN5X_T);
-	// 	add_Value2Json(s, FPSTR((result_SEN5X + F("humidity")).c_str()), FPSTR(DBG_TXT_HUMIDITY), last_value_SEN5X_H);
-	// }
-
-	// ["\"voc\" is not a valid choice. for SEN54/SEN55, type NOT in sensor community table."]
-	// if (memcmp(SEN5X_type, "SEN54", 6) == 0 || memcmp(SEN5X_type, "SEN55", 6) == 0)
-	// {
-	// 	add_Value2Json(s, FPSTR((result_SEN5X + F("VOC")).c_str()), FPSTR(DBG_TXT_VOCINDEX), last_value_SEN5X_VOC);
-	// }
-
-	// if (memcmp(SEN5X_type, "SEN55", 6) == 0)
-	// {// NOx 
-	// 	add_Value2Json(s, FPSTR((result_SEN5X + F("CO2")).c_str()), FPSTR(DBG_TXT_NOX), last_value_SEN5X_NOX);
-	// }
+	add_Value2Json(s, FPSTR((result_SEN5X + F("N10")).c_str()), F("NC10: "), last_value_SEN5X_N10);
+	add_Value2Json(s, FPSTR((result_SEN5X + F("TS")).c_str()),  F("TPS: "), last_value_SEN5X_TS);
 
 	debug_outln_info( FPSTR((result_SEN5X + " read counter: ").c_str()), String(SEN5X_read_counter));
 	debug_outln_info( FPSTR((result_SEN5X + " read error counter: ").c_str()), String(SEN5X_read_error_counter));
@@ -6082,52 +6246,73 @@ static void fetchSensorSEN5X(String &s)
 	value_SEN5X_P0 = value_SEN5X_P1 = value_SEN5X_P2 = value_SEN5X_P4 = 0.0;
 	value_SEN5X_N05 = value_SEN5X_N1 = value_SEN5X_N25 = value_SEN5X_N10 = value_SEN5X_N4 = 0.0;
 	value_SEN5X_TS = 0.0;
-	value_SEN5X_VOC = 0.0;
 
 	debug_outln_info(FPSTR(DBG_TXT_SEP));
 
-	if (memcmp(SEN5X_type, "SEN50", 6) == 0)
-	{
-		debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN50));
-	}
+	// if (memcmp(SEN5X_type, SENSOR_SEN50, 6) == 0)
+	// {
+	// 	debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN50));
+	// }
 
-	if (memcmp(SEN5X_type, "SEN54", 6) == 0)
-	{
-		debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN54));
-	}
+	// if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+	// {
+	// 	debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN54));
+	// }
 
-	if (memcmp(SEN5X_type, "SEN55", 6) == 0)
+	if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
 	{
 		debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN55));
 	}
 }
 
 /*
- 	Temperature and Humidity and Co2 as NOx.
+ 	Temperature and Humidity and NOx as Co2 ID.
 
-	fetchSensorSEN5X() => set last_value_SEN5X_T and last_value_SEN5X_H value.
+	fetchSensorSEN5X() => set last_value_SEN5X_T / last_value_SEN5X_H and last_value_SEN5X_NOX value.
+
+	13-03-2024:
+	sensor community server can't handle NOx ID, (server response code = 400)
 
 */
-static void fetchSensorSEN5X_THN(String &s)
+static void fetchSensorSEN5X_THN(String &s,  bool flg_Nox = true, bool flg_clear = true)
 {
-	if (memcmp(SEN5X_type, "SEN55", 6) == 0 || memcmp(SEN5X_type, "SEN54", 6) == 0)
+	if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0 /*|| memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0*/ )
 	{
 		last_value_SEN5X_T = value_SEN5X_T / SEN5X_measurement_count;
 		last_value_SEN5X_H = value_SEN5X_H / SEN5X_measurement_count;
 		last_value_SEN5X_NOX = value_SEN5X_NOX / SEN5X_measurement_count;
+		last_value_SEN5X_VOC = value_SEN5X_VOC / SEN5X_measurement_count;
 
-		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN55));
+		//String result_SEN5X((char*)0);
+		//result_SEN5X.reserve(10);
+		// same as:
+		RESERVE_STRING(result_SEN5X, 10);
+		result_SEN5X = F("SEN5X_");
 
-		String result_SEN5X = F("SEN5X_");
+		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), result_SEN5X);
+
 		add_Value2Json(s, FPSTR((result_SEN5X + F("temperature")).c_str()), FPSTR(DBG_TXT_TEMPERATURE), last_value_SEN5X_T);
 		add_Value2Json(s, FPSTR((result_SEN5X + F("humidity")).c_str()),    FPSTR(DBG_TXT_HUMIDITY),    last_value_SEN5X_H);
-		add_Value2Json(s, FPSTR((result_SEN5X + F("co2_ppm")).c_str()), 	FPSTR(DBG_TXT_NOX), 		last_value_SEN5X_NOX);	// NOx
 
-		debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN55));
+		if (flg_Nox)
+		{	// NOx value.
+			add_Value2Json(s, FPSTR((result_SEN5X + F("co2_ppm")).c_str()), FPSTR(DBG_TXT_NOX), last_value_SEN5X_NOX);
+		}
+
+	// sensor community server can't handle this ID, (server response code = 400)
+	// if (memcmp(cfg::sen5x_sym_pm, SENSOR_SEN55, 6) == 0)
+	// {
+	// 	add_Value2Json(s, FPSTR((result_SEN5X + F("VOC")).c_str()), F("VOC: "), last_value_SEN5X_VOC);
+	// }
+
+		debug_outln_verbose(FPSTR(DBG_TXT_END_READING), result_SEN5X);
 	}
 
-	value_SEN5X_H = value_SEN5X_T = value_SEN5X_NOX = 0.0;
-	SEN5X_measurement_count = 0;
+	if (flg_clear)
+	{
+		value_SEN5X_H = value_SEN5X_T = value_SEN5X_NOX = value_SEN5X_VOC = 0.0;
+		SEN5X_measurement_count = 0;
+	}
 }
 
 /*****************************************************************
@@ -6139,7 +6324,6 @@ static __noinline void fetchSensorPPD(String &s)
 
 	if (msSince(starttime) <= SAMPLETIME_MS)
 	{
-
 		// Read pins connected to ppd42ns
 		boolean valP1 = digitalRead(PPD_PIN_PM1);
 		boolean valP2 = digitalRead(PPD_PIN_PM2);
@@ -6401,7 +6585,7 @@ static void GetSen5XSensorData()
 		{
 			if (!cfg::sen5x_on)
 			{
-				debug_outln_info(F("SEN5X STOP Measurement. time: "), String(msSince(starttime)));
+				debug_outln_verbose(F("SEN5X STOP Measurement. time: "), String(msSince(starttime)));
 	
 				sen5x.stopMeasurement();
 			}
@@ -6412,8 +6596,8 @@ static void GetSen5XSensorData()
 	else if (is_SEN5X_running && (msSince(starttime) - SEN5X_read_timer) > SEN5X_WAITING_AFTER_LAST_READ)
 	{
 		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_SEN55));
-		debug_outln_info(FPSTR(DBG_TXT_SEP));
-		debug_outln_info(F("SEN5X START sensor readings. time: "), String((msSince(starttime) - (SEN5X_read_timer + (SEN5X_WAITING_AFTER_LAST_READ - SAMPLETIME_SEN5X_MS)))) + F(" msec.") );
+		debug_outln_verbose(FPSTR(DBG_TXT_SEP));
+		debug_outln_verbose(F("SEN5X START sensor readings. time: "), String((msSince(starttime) - (SEN5X_read_timer + (SEN5X_WAITING_AFTER_LAST_READ - SAMPLETIME_SEN5X_MS)))) + F(" msec.") );
 
 		uint16_t error;
 		char errorMessage[256];
@@ -6442,7 +6626,7 @@ static void GetSen5XSensorData()
 
 		if (error)
 		{
-			Debug.print("Error trying to execute readMeasuredPmValues(): ");
+			Debug.print( F("Error trying to execute readMeasuredPmValues(): "));
 			errorToString(error, errorMessage, sizeof(errorMessage));
 			Debug.println(errorMessage);
 		}
@@ -6458,6 +6642,11 @@ static void GetSen5XSensorData()
 			value_SEN5X_N4 += numberConcentrationPm4p0;
 			value_SEN5X_N10 += numberConcentrationPm10p0;
 			value_SEN5X_TS += typicalParticleSize;
+
+			debug_outln_verbose(F("PM1 (sec.): "), String(massConcentrationPm1p0));
+			debug_outln_verbose(F("PM2.5 (sec.): "), String(massConcentrationPm2p5));
+			debug_outln_verbose(F("PM4 (sec.) : "), String(massConcentrationPm4p0));
+			debug_outln_verbose(F("PM10 (sec.) : "), String(massConcentrationPm10p0));
 		}
 
 		error = sen5x.readMeasuredValues(massConcentrationPm1p0, massConcentrationPm2p5, massConcentrationPm4p0, massConcentrationPm10p0,
@@ -6466,7 +6655,7 @@ static void GetSen5XSensorData()
 
 		if (error)
 		{
-			Debug.print("Error trying to execute readMeasuredTHValues(): ");
+			Debug.print(F("Error trying to execute readMeasuredTHValues(): "));
 			errorToString(error, errorMessage, sizeof(errorMessage));
 			Debug.println(errorMessage);
 		}
@@ -6476,6 +6665,10 @@ static void GetSen5XSensorData()
 			value_SEN5X_H += ambientHumidity;
 			value_SEN5X_VOC += vocIndex;
 			value_SEN5X_NOX += noxIndex;
+
+			debug_outln_verbose(F("Temp (sec.): "), String(ambientTemperature));
+			debug_outln_verbose(F("Hum (sec.): "), String(ambientHumidity));
+			debug_outln_verbose(F("NOx (index): "), String(noxIndex));
 		}
 
 		SEN5X_measurement_count++;
@@ -6483,7 +6676,7 @@ static void GetSen5XSensorData()
 		// Set sensor read time on 1 sec. => 5 reads => Nox value = 0 (start/stop)
 		SEN5X_read_timer = msSince(starttime + (SEN5X_WAITING_AFTER_LAST_READ - SAMPLETIME_SEN5X_MS));
 		
-		debug_outln_info(FPSTR(DBG_TXT_SEP));
+		debug_outln_verbose(FPSTR(DBG_TXT_SEP));
 		debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(SENSORS_SEN55));
 	}
 	else
@@ -6492,7 +6685,7 @@ static void GetSen5XSensorData()
 		{
 			if (!cfg::sen5x_on)
 			{
-				debug_outln_info(F("SEN5X START Measurement. Time: "), String(msSince(starttime)));
+				debug_outln_verbose(F("SEN5X START Measurement. Time: "), String(msSince(starttime)));
 				sen5x.startMeasurement();
 			}
 
@@ -6502,26 +6695,18 @@ static void GetSen5XSensorData()
 	}
 }
 
-/*****************************************************************
- * OTA-Update                                                    *
- * client => wifi intstance									 	 *
- * url => URL command string									 *
- * ostream => File stream									 	 *
- *****************************************************************/
-static bool fwDownloadStream(WiFiClientSecure &client, const String &url, Stream *ostream)
-{
-	HTTPClient http;
-	int bytes_written = -1;
+/*
 
-	// work with 128kbit/s downlinks
-	http.setTimeout(60 * 1000);
+*/
+static void GetAgentData( HTTPClient * http)
+{
 	String agent(SOFTWARE_VERSION);
 	agent += ' ';
 	agent += esp_chipid;
 	agent += "/";
 	agent += esp_mac_id;
 	agent += ' ';
-	
+
 	if (cfg::npm_read)
 	{
 		agent += NPM_version_date();
@@ -6550,38 +6735,176 @@ static bool fwDownloadStream(WiFiClientSecure &client, const String &url, Stream
 		agent += F("BETA");
 	}
 
-	http.setUserAgent(agent);
+	http->setUserAgent(agent);
+}
+
+/*****************************************************************
+ * OTA-Update                                                    *
+ * client => Server client intstance						 	 *
+ * url => URL command string									 *
+ * ostream => Stream pointer							 	 	 *
+ *****************************************************************/
+#if defined(CLIENTSECURE)
+static bool fwDownloadStream(WiFiClientSecure &client, const String &url, Stream *ostream)
+#else
+static bool fwDownloadStream(WiFiClient &client, const String &url, Stream *ostream)
+#endif
+{
+	HTTPClient http;
+	int bytes_written = -1;
+	int resp = HTTPC_ERROR_NO_HTTP_SERVER;
+
+	// work with 128kbit/s downlinks
+	http.setTimeout(TIMEOUTFORTCPCONNECTION);
+
+	GetAgentData( &http);
+
 	http.setReuse(false);
 
-	debug_outln_verbose(F("HTTP GET: "), String(FPSTR(FW_DOWNLOAD_HOST)) + ':' + String(FW_DOWNLOAD_PORT) + url);
-	//debug_outln_info(F("HTTP GET: "), String(FPSTR(FW_DOWNLOAD_HOST)) + ':' + String(FW_DOWNLOAD_PORT) + url);
+	debug_outln_info(F("fwDownloadStream( START ): URL = http://"), String(FPSTR(FW_DOWNLOAD_HOST)) + F(":") + String(FW_DOWNLOAD_PORT) + url);
 
-	// example Update firmware url address:  https://firmware.sensor.community:443/airrohr/update/latest_nl.bin	
+	// example Update firmware url address:  http://air.fijnstofleusden.nl:4488/firmware/update/latest_en.bin	
 	if (http.begin(client, FPSTR(FW_DOWNLOAD_HOST), FW_DOWNLOAD_PORT, url))
 	{
-		int resp = http.GET();
+		//start connection and send HTTP header
+		resp = http.GET();
 
-		debug_outln_verbose(F("GET responce code: "), String(resp));
-		//debug_outln_info(F("GET responce code: "), String(resp));
+		debug_outln_verbose(F("GET responce code: "), (resp > (HTTP_CODE_CONTINUE - 1) ? String(resp) : String(resp) + F(" => ") + http.errorToString(resp)));
 
 		last_update_returncode = resp;
 
 		if (resp == HTTP_CODE_OK)
 		{
-			debug_outln_verbose(F("Start writeToStream(***): "));
-			bytes_written = http.writeToStream(ostream);		// data stored in file in SPIFF memory drive.
-			debug_outln_verbose(F("End writeToStream(**): ret code: "), String(bytes_written));
+			int total = http.getSize();
+
+			debug_outln_verbose(F("Start write To Stream(***): bytes = "), String(total));
+
+			// store firmware.bin data file onto SPIFF memory drive.
+			bytes_written = http.writeToStream(ostream);
+
+			debug_outln_verbose(F("End writeToStream: bytes = "), String(bytes_written));
 		}
 
 		http.end();
 	}
 
-	debug_outln_verbose(F("HTTP End: read chars = "), String(bytes_written));
+	if (bytes_written > 0)
+	{
+		debug_outln_verbose(F("fwDownloadStream( END )"));
+		return true;
+	}
+
+		debug_outln_verbose(F("fwDownloadStream( ENDED ) with Error: "), (resp > (HTTP_CODE_CONTINUE - 1)) ? String(resp) : http.errorToString(bytes_written));
+
+
+	return false;
+}
+
+/*****************************************************************
+ * OTA-Update                                                    *
+ * client => Server client intstance						 	 *
+ * url => URL command string									 *
+ * ofileStream => File stream pointer							 *
+ *****************************************************************/
+#if defined(CLIENTSECURE)
+static bool fwDownloadFileStream(WiFiClientSecure &client, const String &url, Stream *ostream)
+#else
+static bool fwDownloadFileStream(WiFiClient &client, const String &url, Stream * ofileStream)
+#endif
+{
+	HTTPClient http;
+	int bytes_written = -1;
+	int resp = HTTPC_ERROR_NO_HTTP_SERVER;
+
+	// work with 128kbit/s downlinks
+	http.setTimeout(TIMEOUTFORTCPCONNECTION);
+
+	GetAgentData( &http);
+
+	http.setReuse(false);
+
+	debug_outln_info(F("fwDownloadFileStream( START ): URL = http://"), String(FPSTR(FW_DOWNLOAD_HOST)) + F(":") + String(FW_DOWNLOAD_PORT) + url);
+
+	// example Update firmware url address:  http://air.fijnstofleusden.nl:4488/firmware/update/latest_en.bin
+	if (http.begin(client, FPSTR(FW_DOWNLOAD_HOST), FW_DOWNLOAD_PORT, url))
+	{
+		// start connection and send HTTP header
+		resp = http.GET();
+
+		debug_outln_verbose(F("GET responce code: "), (resp > (HTTP_CODE_CONTINUE - 1) ? String(resp) : String(resp) + F(" => ") + http.errorToString(resp)));
+
+		last_update_returncode = resp;
+
+		if (resp == HTTP_CODE_OK)
+		{
+			debug_outln_verbose(F("Start write To File"));
+
+			// get lenght of document (is -1 when Server sends no Content-Length header)
+			int total = http.getSize();
+			int len = total;
+			bytes_written = 0;
+
+			debug_outln_verbose(F("Server send: Total File size: ") + String(total));
+
+			// create read-buffer.
+			uint8_t buff[1024] = {0};
+
+			// Get TCP stream pointer.
+			WiFiClient *stream = http.getStreamPtr();
+
+			// Read all data from server.
+			while (len > 0 )
+			{
+				// Get available data size.
+				size_t size = stream->available();
+
+				if (size)
+				{
+					// read up to max. 1024 bytes
+					int cnt = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+
+					//debug_outln_verbose(F("File Stream counter: ") + String(size) + F(" | Read Bytes count: ") + String(cnt));
+
+					// Write buffer[] to SPIFFS memory flash-drive.
+					ofileStream->write(buff, cnt);
+
+					if (len > 0)
+					{
+						len -= cnt;
+						bytes_written += cnt;
+					}
+
+					if (cfg::debug >= DEBUG_MED_INFO)
+					{
+						//debug_outln_verbose(F("Count: ") + String(bytes_written));
+						Debug.print("*");
+					}
+				}
+				else
+				{
+					delay(5);				// delay of 5 msec.
+					continue;
+				}
+
+				//yield();					// this can give a "PANIC exception" in core_esp8266_main.cpp => __yield() function.
+				delay(1);					// delay of 1 msec.
+
+			}// while loop
+
+			debug_outln_verbose(F("\nEnd writeStreamToFile: ret code: "), String(bytes_written));
+		}
+
+		http.end();
+	}
 
 	if (bytes_written > 0)
 	{
+		debug_outln_verbose(F("fwDownloadFileStream( END )"));
+
 		return true;
 	}
+
+	debug_outln_verbose(F("fwDownloadFileStream( ENDED ) with Error: "), (resp > (HTTP_CODE_CONTINUE - 1)) ? String(resp) : http.errorToString(bytes_written));
 
 	return false;
 }
@@ -6589,35 +6912,46 @@ static bool fwDownloadStream(WiFiClientSecure &client, const String &url, Stream
 /// @brief 
 /// @param client 
 /// @param url 
-/// @param fname 
+/// @param File stream 
 /// @return 
-static bool fwDownloadStreamFile(WiFiClientSecure &client, const String &url, const String &fname)
+#if defined(CLIENTSECURE)
+static bool fwDownloadStreamFile(WiFiClientSecure &client, const String &url, const String &filename)
+#else
+static bool fwDownloadStreamFile(WiFiClient &client, const String &url, const String &filename)
+#endif
 {
-	debug_outln_verbose(F("fwDownloadStreamFile(): URL | file name "), String(url) + " | " + String(fname));
+	debug_outln_verbose(F("fwDownloadStreamFile(): URL:"), String(url) + " | File Stream name: " + String(filename));
 
-	String fname_new(fname);
+	String fname_new(filename);
 	fname_new += F(".new");
 	bool downloadSuccess = false;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-	File fwFile = SPIFFS.open(fname_new, "w");
+	SPIFFS.remove(fname_new);
+	fs::File fwFile = SPIFFS.open(fname_new, "w"); // create a file to write the downloaded data to.
 
 	// bool fileExist = SPIFFS.exists(fname_new);
-	// debug_outln_verbose(F("Check if File Open, File Name: "), fname_new + F(", Exist: ") + String(fileExist));
+	// debug_outln_verbose(F("Check if File Open and ready to write, File Name: "), fname_new + F(", Exist: ") + String(fileExist));
 
-	debug_outln_verbose(F("File created in SPIFFS, Stream to File object: "), fwFile.fullName());
+	debug_outln_verbose(F("File created in SPIFFS, Stream to File: "), fwFile.fullName());
 
 	if (fwFile)
 	{
+
+#if defined(CLIENTSECURE)
 		downloadSuccess = fwDownloadStream(client, url, &fwFile);
+#else
+		downloadSuccess = fwDownloadFileStream(client, url, &fwFile);
+#endif
+
 		fwFile.close();
 
 		if (downloadSuccess)
 		{
-			SPIFFS.remove(fname);
-			SPIFFS.rename(fname_new, fname);
+			SPIFFS.remove(filename);
+			SPIFFS.rename(fname_new, filename);
 			debug_outln_info(F("Success downloading: "), url);
 		}
 	}
@@ -6626,7 +6960,7 @@ static bool fwDownloadStreamFile(WiFiClientSecure &client, const String &url, co
 		debug_outln_verbose(F("File open failed"));
 	}
 
-	debug_outln_verbose(F("fwDownloadStreamFile():Ending, status: "), String(downloadSuccess));
+	debug_outln_verbose(F("fwDownloadStreamFile( Ending ): Download status: "), downloadSuccess ? F("OK") : F("FAILED"));
 
 	if (downloadSuccess)
 	{
@@ -6634,13 +6968,42 @@ static bool fwDownloadStreamFile(WiFiClientSecure &client, const String &url, co
 	}
 
 	SPIFFS.remove(fname_new);
-	
+
 #pragma GCC diagnostic pop
 
 	return false;
 }
 
 /*
+	airrohr-update-loader:
+	A transitional firmware which will look for a firmware file stored on SPIFFS to replace itself with for next reboot
+	or do an endless loop of panic LED blinking if this fails.
+*/
+static void twoStageOTAUpdate()
+{
+	if (!cfg::auto_update)
+	{ // NO auto firmware update.
+		return;
+	}
+
+	debug_outln_info(F("two Stage Automatic OTA Update"));
+
+	rst_info * reset_Info = EspClass::getResetInfoPtr();
+	debug_outln_verbose(F("ESP Restart Reason code: "), String(reset_Info->reason));
+	if( reset_Info->reason == rst_reason::REASON_WDT_RST ||		/* hardware watch dog reset */
+		reset_Info->reason == rst_reason::REASON_SOFT_WDT_RST)	/* software watch dog reset */
+	{// this could be, if WiFi connection is slow.
+		return;
+	}
+
+	// start OTA process on main loop().
+	flg_OTAStartbyWebCall = true;
+	//StartTwoStageOTAUpdate();
+}
+
+/*
+	Start Two Stage OTA Update process.
+
 	airrohr-update-loader:
 	A transitional firmware which will look for a firmware file stored on SPIFFS to replace itself with for next reboot 
 	or do an endless loop of panic LED blinking if this fails.
@@ -6649,19 +7012,10 @@ static bool fwDownloadStreamFile(WiFiClientSecure &client, const String &url, co
 	for firmwares larger than 512k (up to ~ 740k).
 
 */
-static void twoStageOTAUpdate()
+static void StartTwoStageOTAUpdate()
 {
-	// always return => process become dead could not load binary data into FS.
-	// TODO: to find out what are the problem.
-	return;
-
-	if (!cfg::auto_update)
-	{// NO auto firmware update.
-		return;
-	}
-
 #if defined(ESP8266)
-	debug_outln_info(F("twoStageOTAUpdate"));
+	debug_outln_info(F("StartTwoStageOTAUpdate"));
 
 	String lang_variant(cfg::current_lang);
 	if (lang_variant.length() != 2)
@@ -6671,23 +7025,29 @@ static void twoStageOTAUpdate()
 
 	lang_variant.toLowerCase();
 
-	String fetch_name(F(OTA_BASENAME "/update/latest_"));
+	String fetch_name( String(FPSTR(FW_DOWNLOAD_URL)) + F("/latest_"));
 	if (cfg::use_beta)
 	{
-		fetch_name = F(OTA_BASENAME "/beta/latest_");
+		fetch_name = String(FPSTR(FW_DOWNLOAD_URL)) + F(OTA_BASENAME "/beta/latest_");
 	}
 
 	// OTA HTTP server URL
-	// https://firmware.sensor.community:443/airrohr/update/latest_nl.bin
+	// 			http://air.fijnstofleusden.nl:4488/firmware/update/latest_en.bin
 	fetch_name += lang_variant;
 	fetch_name += F(".bin");
 
-	WiFiClientSecure client;
+#if defined(CLIENTSECURE)
+	BearSSL::WiFiClientSecure client;
 	BearSSL::Session clientSession;
 
 	client.setBufferSizes(1024, TCP_MSS > 1024 ? 2048 : 1024);
 	client.setSession(&clientSession);
+	//client.setSSLVersion(BR_TLS12, BR_TLS13);
+
 	configureCACertTrustAnchor(&client);
+#else
+	WiFiClient client;
+#endif
 
 	String fetch_md5_name(fetch_name);
 	fetch_md5_name += F(".md5");
@@ -6695,6 +7055,7 @@ static void twoStageOTAUpdate()
 	StreamString newFwmd5;
 	if (!fwDownloadStream(client, fetch_md5_name, &newFwmd5))
 	{
+		debug_outln_verbose(F("No .md5 file found on Update server."));
 		return;
 	}
 
@@ -6702,7 +7063,8 @@ static void twoStageOTAUpdate()
 	if (newFwmd5 == ESP.getSketchMD5())
 	{
 		display_debug(FPSTR(DBG_TXT_UPDATE), FPSTR(DBG_TXT_UPDATE_NO_UPDATE));
-		debug_outln_verbose(F("No newer version available."));
+
+		debug_outln_verbose(F("No newer version available. Current md5: "), ESP.getSketchMD5());
 		return;
 	}
 
@@ -6710,109 +7072,53 @@ static void twoStageOTAUpdate()
 	debug_outln_info(F("Current Sketch md5: "), ESP.getSketchMD5());
 
 	// We're entering update phase, kill off everything else
+	if (cfg::has_radarmotion)
+	{// Stop Radar motion Event process.
+		RCWL0516.end();
+	}
+
 	WiFiUDP::stopAll();
 	WiFiClient::stopAllExcept(&client);
 	delay(100);
 
-	debug_outln_verbose(F("Start DownloadStreamFilev process.."));
-
+	// Start Firmware File Loading process..
 	String firmware_name(F("/firmware.bin"));
-	String firmware_md5(F("/firmware.bin.md5"));
+	String firmware_md5_name(F("/firmware.bin.md5"));
 	String loader_name(F("/loader.bin"));
 
-	debug_outln_verbose(F("Start DownloadStreamFile() process.. "), String(fetch_name) + " | " + String(firmware_name));
-
-//---------------- TEST TEST -----File write / read works OK ------------------------------------------------------------------------------------------------------------
-#if TEST
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wsign-compare"
-
-	// Create New File And Write Data to It
-	// w=Write Open file for writing
-	File f = SPIFFS.open(firmware_name, "w");
-
-	if (!f)
-	{
-		debug_outln_verbose(F("file open failed"));
-	}
-	else
-	{
-		// Write data to file
-		debug_outln_verbose(F("Writing Data to File"));
-		f.print("This is sample data which is written in file");
-		f.close(); // Close file
-	}
-
-	delay(2000);
-
-	// Read File data
-	File rf = SPIFFS.open(firmware_name, "r");
-
-	if (!rf)
-	{
-		debug_outln_verbose(F("file open failed"));
-	}
-	else
-	{
-		debug_outln_verbose(F("Reading Data from File:"));
-
-		String tmp = "";
-
-		// Data from file.
-		for (int i = 0; i < rf.size(); i++) // Read upto complete file size
-		{
-			tmp += (char)rf.read();
-		}
-
-		debug_outln_info(F("file contents: "), tmp);
-
-		rf.close(); // Close file
-		debug_outln_info(F("File Closed"));
-	}
-
-	debug_outln_info(F("Remove File from FS: "), firmware_name);
-	SPIFFS.remove(firmware_name);
-
-	delay(1000);
-
-	return;
-
-	#pragma GCC diagnostic pop
-
-#endif
-//--------------------TEST TEST -------------------------------------------------------------------------------------------------------------
-
+	//debug_outln_verbose(F("Firmware File process.."), String(fetch_name) + F(" => ") + String(firmware_name));
+	debug_outln_verbose(F("Start Download Firmware File process.."));
 
 	if (!fwDownloadStreamFile(client, fetch_name, firmware_name))
 	{
-		debug_outln_verbose(F("Failed DownloadStreamFile() firmware_name file.."));
+		debug_outln_verbose(F("Failed DownloadStreamFile(): "), fetch_name);
 		return;
 	}
 
-	if (!fwDownloadStreamFile(client, fetch_md5_name, firmware_md5))
+	if (!fwDownloadStreamFile(client, fetch_md5_name, firmware_md5_name))
 	{
-		debug_outln_verbose(F("Failed DownloadStreamFile() firmware_md5 file.."));
+		debug_outln_verbose(F("Failed DownloadStreamFile(): "), fetch_md5_name);
 		return;
 	}
 
 	if (!fwDownloadStreamFile(client, FPSTR(FW_2ND_LOADER_URL), loader_name))
 	{
-		debug_outln_verbose(F("Failed DownloadStreamFile() loader_name file.."));
+		debug_outln_verbose(F("Failed DownloadStreamFile(): "), loader_name);
 		return;
 	}
 
-	debug_outln_verbose(F("All Files are downloaded.. "), String(firmware_name));
+	debug_outln_verbose(F("END, all firmware files are loaded.. "), FPSTR(FW_2ND_LOADER_URL));
 
 	// SPIFFS is deprecated, we know
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 	File fwFile = SPIFFS.open(firmware_name, "r");
 
 	if (!fwFile)
 	{
 		SPIFFS.remove(firmware_name);
-		SPIFFS.remove(firmware_md5);
+		SPIFFS.remove(firmware_md5_name);
 		debug_outln_error(F("Failed reopening fw file.."));
 		return;
 	}
@@ -6821,42 +7127,64 @@ static void twoStageOTAUpdate()
 	MD5Builder md5;
 	md5.begin();
 	md5.addStream(fwFile, fwSize);
-	md5.calculate();
+	md5.calculate();					// calculate md5 hash value.
 	fwFile.close();
+
 	String md5String = md5.toString();
 
-	// Firmware is always at least 128 kB and padded to 16 bytes
+	// Firmware is always at least 128 kB and padded to 16 bytes.
 	if (fwSize < (1 << 17) || (fwSize % 16 != 0) || newFwmd5 != md5String)
 	{
 		debug_outln_info(F("FW download failed validation.. deleting"));
 		SPIFFS.remove(firmware_name);
-		SPIFFS.remove(firmware_md5);
+		SPIFFS.remove(firmware_md5_name);
 		return;
 	}
 
 	StreamString loaderMD5;
 	if (!fwDownloadStream(client, String(FPSTR(FW_2ND_LOADER_URL)) + F(".md5"), &loaderMD5))
 	{
+		debug_outln_verbose(F("No loader.md5 file found on Update server."));
 		return;
 	}
 
 	loaderMD5.trim();
 
-	debug_outln_info(F("launching 2nd stage"));
+	debug_outln_info(F("Launching 2nd stage."));
+
+	// debug_outln_verbose(F("Check SPIFFS flas drive root: "));
+  	// String fileName;
+  	// fs::Dir dir = SPIFFS.openDir(F("/"));
+  	// while (dir.next())
+	// {
+	//	fileName = dir.fileName() + F(" | size: ") + String(dir.fileSize());
+	// 	debug_outln_verbose(fileName);
+	// }
+	//
+	// debug_outln_verbose(F(".... TEST END TEST .... "));
+	// return;
+
+
 	if (!launchUpdateLoader(loaderMD5))
-	{
+	{// Could NOT flash Loader application into flash memory from address 0.
 		debug_outln_error(FPSTR(DBG_TXT_UPDATE_FAILED));
 		display_debug(FPSTR(DBG_TXT_UPDATE), FPSTR(DBG_TXT_UPDATE_FAILED));
+
 		SPIFFS.remove(firmware_name);
-		SPIFFS.remove(firmware_md5);
+		SPIFFS.remove(firmware_md5_name);
 		return;
 	}
+
 #pragma GCC diagnostic pop
 
 	sensor_restart();
+
 #endif
 }
 
+/*
+	display Generate Footer
+*/
 static String displayGenerateFooter(unsigned int screen_count)
 {
 	String display_footer;
@@ -6864,6 +7192,7 @@ static String displayGenerateFooter(unsigned int screen_count)
 	{
 		display_footer += (i != (next_display_count % screen_count)) ? " . " : " o ";
 	}
+
 	return display_footer;
 }
 
@@ -6993,23 +7322,23 @@ static void display_values()
 
 	if (cfg::sen5x_read)
 	{
-		if (memcmp(SEN5X_type, "SEN50", 6) == 0)
-		{
-			pm01_sensor = FPSTR(SENSORS_SEN50);
-			pm10_sensor = FPSTR(SENSORS_SEN50);
-			pm25_sensor = FPSTR(SENSORS_SEN50);
-			t_sensor = h_sensor = voc_sensor = FPSTR(SENSORS_SEN50);
-		}
+		// if (memcmp(SEN5X_type, SENSOR_SEN50, 6) == 0)
+		// {
+		// 	pm01_sensor = FPSTR(SENSORS_SEN50);
+		// 	pm10_sensor = FPSTR(SENSORS_SEN50);
+		// 	pm25_sensor = FPSTR(SENSORS_SEN50);
+		// 	t_sensor = h_sensor = voc_sensor = FPSTR(SENSORS_SEN50);
+		// }
 
-		if (memcmp(SEN5X_type, "SEN54", 6) == 0)
-		{
-			pm01_sensor = FPSTR(SENSORS_SEN54);
-			pm10_sensor = FPSTR(SENSORS_SEN54);
-			pm25_sensor = FPSTR(SENSORS_SEN54);
-			t_sensor = h_sensor = voc_sensor = FPSTR(SENSORS_SEN54);
-		}
+		// if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+		// {
+		// 	pm01_sensor = FPSTR(SENSORS_SEN54);
+		// 	pm10_sensor = FPSTR(SENSORS_SEN54);
+		// 	pm25_sensor = FPSTR(SENSORS_SEN54);
+		// 	t_sensor = h_sensor = voc_sensor = FPSTR(SENSORS_SEN54);
+		// }
 
-		if (memcmp(SEN5X_type, "SEN55", 6) == 0)
+		if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
 		{
 			pm01_sensor = FPSTR(SENSORS_SEN55);
 			pm10_sensor = FPSTR(SENSORS_SEN55);
@@ -7309,16 +7638,17 @@ static void display_values()
 		case 13:
 			display_header = F("Sensirion SEN5X");
 
-			if (memcmp(SEN5X_type, "SEN50", 6) == 0)
-			{
-			}
-			else if (memcmp(SEN5X_type, "SEN54", 6) == 0)
-			{
-				display_lines[0] = std::move(tmpl(F("Temp.: {v} °C"), check_display_value(t_value, -128, 1, 6)));
-				display_lines[1] = std::move(tmpl(F("Humi: {v} %"), check_display_value(h_value, -1, 1, 6)));
-				display_lines[2] = std::move(tmpl(F("VOC: {v} (index)"), check_display_value(voc_value, -1, 1, 6)));
-			}
-			else if (memcmp(SEN5X_type, "SEN55", 6) == 0)
+			// if (memcmp(SEN5X_type, SENSOR_SEN50, 6) == 0)
+			// {
+			// }
+			// else if (memcmp(SEN5X_type, SENSOR_SEN54, 6) == 0)
+			// {
+			// 	display_lines[0] = std::move(tmpl(F("Temp.: {v} °C"), check_display_value(t_value, -128, 1, 6)));
+			// 	display_lines[1] = std::move(tmpl(F("Humi: {v} %"), check_display_value(h_value, -1, 1, 6)));
+			// 	display_lines[2] = std::move(tmpl(F("VOC: {v} (index)"), check_display_value(voc_value, -1, 1, 6)));
+			// }
+			// else 
+			if (memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
 			{
 				// display_lines[0] = std::move(tmpl(F("Humi: {v} %"), check_display_value(h_value, -1, 1, 6)));
 				// display_lines[1] = std::move(tmpl(F(": {v} (index)"), check_display_value(voc_value, -1, 1, 6)));
@@ -7598,7 +7928,7 @@ static void initSEN5X()
 	error = sen5x.deviceReset();
 	if (error)
 	{
-		Debug.print("SEN5X_DeviceReset() return Error: ");
+		Debug.print(F("SEN5X_DeviceReset() return Error: "));
 		errorToString(error, errorMessage, 256);
 		Debug.println(errorMessage);
 		debug_outln_error(F("Check SEN5x sensor is NOT connected!"));
@@ -7608,8 +7938,8 @@ static void initSEN5X()
 	}
 
 #ifdef USE_PRODUCT_INFO
-	printSerialNumber();
 	printModuleVersions();
+	printSerialNumber();
 #endif
 
 	if (sen5x.setFanAutoCleaningInterval(SEN5X_AUTO_CLEANING_INTERVAL) != 0)
@@ -7620,35 +7950,38 @@ static void initSEN5X()
 	}
 
     // Adjust tempOffset to account for additional temperature offsets
-    // exceeding the SEN module's self heating.
-    float tempOffset = readCorrectionOffset(cfg::temp_correction);		//String(cfg::temp_correction).toFloat();
+    // exceeding the SEN5X module's self heating.
+    float tempOffset = readCorrectionOffset(cfg::scd30_temp_correction);		//String(cfg::scd30_temp_correction).toFloat();
     error = sen5x.setTemperatureOffsetSimple(tempOffset);
 
     if (error) 
 	{
-        Debug.print("Error trying to execute setTemperatureOffsetSimple(): ");
+        Debug.print(F("Error trying to execute setTemperatureOffsetSimple(): "));
         errorToString(error, errorMessage, 256);
         Debug.println(errorMessage);
     } 
 	else 
 	{
-        Debug.print("Temperature Offset = ");
+        Debug.print(F("Temperature Offset = "));
         Debug.print(tempOffset);
-        Debug.println(" deg. Celsius (SEN54/SEN55 only)");
+        Debug.println(F(" °C. (SEN54/SEN55 only)"));
     }
 
 	error = sen5x.startMeasurement();
 
 	if (error)
 	{
-		Debug.print("Error trying to execute startMeasurement(): ");
+		Debug.print(F("Error trying to execute startMeasurement(): "));
 		errorToString(error, errorMessage, 256);
 		Debug.println(errorMessage);
 		is_Sen5x_init_failed = true;
-		//return;
 	}
 	else
 	{
+		debug_outln_info(F("Emulate SEN55:"));
+		debug_outln_info(F("\tPM - "), FPSTR(cfg::sen5x_sym_pm));
+		debug_outln_info(F("\tTH - "), FPSTR(cfg::sen5x_sym_th));
+
 		debug_outln(F("SEN5X sensor active. Sensor Fan Cleaning and Warm-Up for the first Measurement."), DEBUG_MIN_INFO);
 		sen5x.startFanCleaning();
 		is_SEN5X_running = false;
@@ -7767,6 +8100,7 @@ static void powerOnTestSensors()
 		uint8_t test_state;
 		delay(15000); // wait a bit to be sure Next PM is ready to receive instructions.
 		test_state = NPM_get_state();
+		
 		if (test_state == 0x00)
 		{
 			debug_outln_info(F("NPM already started..."));
@@ -7787,14 +8121,17 @@ static void powerOnTestSensors()
 			{
 				debug_outln_info(F("Default state"));
 			}
+
 			if (bitRead(test_state, 2) == 1)
 			{
 				debug_outln_info(F("Not ready"));
 			}
+
 			if (bitRead(test_state, 3) == 1)
 			{
 				debug_outln_info(F("Heat error"));
 			}
+
 			if (bitRead(test_state, 4) == 1)
 			{
 				debug_outln_info(F("T/RH error"));
@@ -7991,60 +8328,58 @@ static void powerOnTestSensors()
 */
 static void logEnabledAPIs()
 {
+	debug_outln_info(FPSTR(DBG_TXT_SEP));
 	debug_outln_info(F("Send to :"));
 
 	if (cfg::send2dusti)
 	{
-		debug_outln_info(F("sensor.community"));
+		debug_outln_info(F("\tsensor.community"));
 	}
 
 	if (cfg::send2fsapp)
 	{
-		debug_outln_info(F("Feinstaub-App"));
+		debug_outln_info(F("\tFeinstaub-App"));
 	}
 
 	if (cfg::send2madavi)
 	{
-		debug_outln_info(F("Madavi.de"));
+		debug_outln_info(F("\tMadavi.de"));
 	}
 
 	if (cfg::send2csv)
 	{
-		debug_outln_info(F("Serial as CSV"));
+		debug_outln_info(F("\tSerial as CSV"));
 	}
 
 	if (cfg::send2custom)
 	{
-		debug_outln_info(F("custom API"));
+		debug_outln_info(F("\tcustom API"));
 	}
 	
 	if (cfg::send2mqtt)
 	{
-		debug_outln_info(F("MQTT broker: "), String(cfg::mqtt_server));
-		debug_outln_info(F(" - Port: "), String(cfg::mqtt_port));
-		debug_outln_info(F(" - User: "), String(cfg::mqtt_user));
-//		debug_outln_info(F(" - Pasword: "), String(cfg::mqtt_pwd));
-		debug_outln_info(F(" - Topic: "), String(cfg::mqtt_topic));
-		debug_outln_info(F(" - MQTT-client: "), String(mqtt_client_id));
-
+		debug_outln_info(F("\tMQTT broker: "), String(cfg::mqtt_server));
+		debug_outln_info(F("\t\t- Port: "), String(cfg::mqtt_port));
+		debug_outln_info(F("\t\t- User: "), String(cfg::mqtt_user));
+//		debug_outln_info(F("\t\t- Pasword: "), String(cfg::mqtt_pwd));
+		debug_outln_info(F("\t\t- Topic: "), String(cfg::mqtt_topic));
+		debug_outln_info(F("\t\t- MQTT-client: "), String(mqtt_client_id));
 	}
 
 	if (cfg::send2aircms)
 	{
-		debug_outln_info(F("aircms API"));
+		debug_outln_info(F("\taircms API"));
 	}
 
 	if (cfg::send2influx)
 	{
-		debug_outln_info(F("custom influx DB"));
+		debug_outln_info(F("\tcustom influx DB"));
 	}
 
 	if (cfg::send2sensemap)
 	{
-		debug_outln_info(F("OpenSenseMap.org"));
+		debug_outln_info(F("\tOpenSenseMap.org"));
 	}
-
-	debug_outln_info(FPSTR(DBG_TXT_SEP));
 
 /*
 	if (cfg::auto_update)
@@ -8052,6 +8387,8 @@ static void logEnabledAPIs()
 		debug_outln_info(F("Auto-Update active..."));
 	}
 */
+
+	debug_outln_info(FPSTR(DBG_TXT_SEP));
 
 }
 
@@ -8099,8 +8436,8 @@ static void setupNetworkTime()
 
 	strcpy_P(ntpServer1, NTP_SERVER_1);
 	strcpy_P(ntpServer2, NTP_SERVER_2);
-	//configTime(0, 0, ntpServer1, ntpServer2);
 
+	//configTime(0, 0, ntpServer1, ntpServer2);
 	configTime(MY_TZ, 0, ntpServer1, ntpServer2);	// set Daylight Saving => NTP with auto-switching between summer/winter time.
 }
 
@@ -8110,6 +8447,16 @@ static void setupNetworkTime()
 static unsigned long sendDataToOptionalApis(const String &data)
 {
 	unsigned long sum_send_time = 0;
+	RESERVE_STRING(data_sensemap, LARGE_STR);
+
+	if (cfg::sen5x_read && (!is_Sen5x_init_failed))
+	{
+		data_sensemap = data;
+		data_sensemap.replace("SEN55", cfg::sen5x_sym_pm);	 	// replace PM Sensor Type Name.
+		data_sensemap.replace("SEN5X", cfg::sen5x_sym_th);		// replace temp/hummidity/NOx Sensor Type Name.
+
+		debug_outln_verbose(F("sendDataToOptionalApis data:\n"), data_sensemap);
+	}
 
 	if (cfg::send2madavi)
 	{
@@ -8117,15 +8464,6 @@ static unsigned long sendDataToOptionalApis(const String &data)
 
 		if (cfg::sen5x_read && (!is_Sen5x_init_failed))
 		{
-			debug_outln_info(F("Emulate SEN55:"));
-			debug_outln_info(F("TH - "), FPSTR(cfg::sen5x_sym_th));
-			debug_outln_info(F("PM - "), FPSTR(cfg::sen5x_sym_pm));
-
-			RESERVE_STRING(data_sensemap, LARGE_STR);
-			data_sensemap = data;
-			data_sensemap.replace("SEN55", cfg::sen5x_sym_pm);	// set PM sensor Name.
-			data_sensemap.replace("SEN5X", cfg::sen5x_sym_th);	// set temp/hummidity/NOx sensor Name.
-
 			sum_send_time += sendData(LoggerMadavi, data_sensemap, 0, HOST_MADAVI, URL_MADAVI);
 		}
 		else
@@ -8136,59 +8474,44 @@ static unsigned long sendDataToOptionalApis(const String &data)
 
 	if (cfg::send2sensemap && (cfg::senseboxid[0] != '\0'))
 	{
+		String sensemap_path(tmpl(FPSTR(URL_SENSEMAP), cfg::senseboxid));
+
+		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("opensensemap: "));
+
 		if (cfg::sen5x_read && (!is_Sen5x_init_failed))
-		{	// OpenSenseMap
-			// RESERVE_STRING(data_sensemap, MED_STR);			// LARGE_STR
-			// data_sensemap = FPSTR( (String("{ \"") + String(JSON_SENSOR_DATA_VALUES) + String("\":[")).c_str() );	//FPSTR(data_first_part);
-			// this works
-			// add_Value2Json(data_sensemap, F("SPS30_P0"), F("PM1.0: "), last_value_SEN5X_P0);
-			// add_Value2Json(data_sensemap, F("SPS30_P2"), F("PM2.5: "), last_value_SEN5X_P2);
-			// add_Value2Json(data_sensemap, F("SPS30_P4"), F("PM4.0: "), last_value_SEN5X_P4);
-			// add_Value2Json(data_sensemap, F("SPS30_P1"), F("PM 10: "), last_value_SEN5X_P1);
-			// add_Value2Json(data_sensemap, F("SCD30_temperature"), FPSTR(DBG_TXT_TEMPERATURE), last_value_SEN5X_T);
-			// add_Value2Json(data_sensemap, F("SCD30_humidity"), FPSTR(DBG_TXT_HUMIDITY), last_value_SEN5X_H);
+		{ // OpenSenseMap
+			RESERVE_STRING(data_2_sensemap, LARGE_STR);
+			data_2_sensemap = data_sensemap;
+			data_2_sensemap.replace("signal", "wifi_signal");	// replace Wifi signal ID.
 
-			// data_sensemap.remove(data_sensemap.length() - 1);			// remove ',' char.
-			// data_sensemap += "]}";										// Add end markers
-			// or this
+			sum_send_time += sendData(LoggerSensemap, data_2_sensemap, 0, HOST_SENSEMAP, sensemap_path.c_str());
 
-			RESERVE_STRING(data_sensemap, LARGE_STR);
-			data_sensemap = data;
-			data_sensemap.replace("SEN55", cfg::sen5x_sym_pm); 				// set PM sensor Name
-			data_sensemap.replace("SEN5X", cfg::sen5x_sym_th);				// set temp/hummidity/NOx sensor Name
-
-			data_sensemap.replace("signal", "wifi_signal");					// Wifi signal info
-			
-				// end
-
-			debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("opensensemap: "));
-			// debug_outln_info(F("Emulate SEN55 -"));
-			// debug_outln_info(F("TH - "), FPSTR(cfg::sen5x_sym_th));
-			// debug_outln_info(F("PM - "), FPSTR(cfg::sen5x_sym_pm));
-
-			String sensemap_path(tmpl(FPSTR(URL_SENSEMAP), cfg::senseboxid));
-			sum_send_time += sendData(LoggerSensemap, data_sensemap, 0, HOST_SENSEMAP, sensemap_path.c_str());
-
-			debug_outln_info(F("opensensemap data: "), data_sensemap);
+			debug_outln_verbose(F("opensensemap data: "), data_2_sensemap);
 		}
 		else
 		{
-			debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("opensensemap: "));
-			
-			String sensemap_path(tmpl(FPSTR(URL_SENSEMAP), cfg::senseboxid));
 			sum_send_time += sendData(LoggerSensemap, data, 0, HOST_SENSEMAP, sensemap_path.c_str());
 		}
 	}
 
 	if (cfg::send2fsapp)
-	{
-		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("Server FS App: "));
-		sum_send_time += sendData(LoggerFSapp, data, 0, HOST_FSAPP, URL_FSAPP);
+	{ // for feinstaub program developt by chillibits.com
+		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("Server FeinStaube App: "));
+
+		if (cfg::sen5x_read && (!is_Sen5x_init_failed))
+		{
+			sum_send_time += sendData(LoggerFSapp, data_sensemap, 0, HOST_FSAPP, URL_FSAPP);
+		}
+		else
+		{
+			sum_send_time += sendData(LoggerFSapp, data, 0, HOST_FSAPP, URL_FSAPP);
+		}
 	}
 
 	if (cfg::send2aircms)
 	{
 		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("aircms.online: "));
+
 		unsigned long ts = millis() / 1000;
 		String token = WiFi.macAddress();
 		String aircms_data("L=");
@@ -8196,7 +8519,8 @@ static unsigned long sendDataToOptionalApis(const String &data)
 		aircms_data += "&t=";
 		aircms_data += String(ts, DEC);
 		aircms_data += F("&airrohr=");
-		aircms_data += data;
+		aircms_data += (cfg::sen5x_read && (!is_Sen5x_init_failed)) ? data_sensemap : data;
+
 		String aircms_url(FPSTR(URL_AIRCMS));
 		aircms_url += hmac1(sha1Hex(token), aircms_data + token);
 
@@ -8206,35 +8530,66 @@ static unsigned long sendDataToOptionalApis(const String &data)
 	if (cfg::send2influx)
 	{
 		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("custom influx db: "));
+
 		RESERVE_STRING(data_4_influxdb, LARGE_STR);
-		create_influxdb_string_from_data(data_4_influxdb, data);
+		create_influxdb_string_from_data(data_4_influxdb, (cfg::sen5x_read && (!is_Sen5x_init_failed)) ? data_sensemap : data);
+
 		sum_send_time += sendData(LoggerInflux, data_4_influxdb, 0, cfg::host_influx, cfg::url_influx);
 	}
 
 	if (cfg::send2custom)
 	{
-		String data_to_send = data;
+		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("custom api: "));
+
+		RESERVE_STRING(data_4_custom, LARGE_STR);
+		RESERVE_STRING(data_to_send, LARGE_STR);
+
+		data_to_send = (cfg::sen5x_read && (!is_Sen5x_init_failed)) ? data_sensemap : data;
 		data_to_send.remove(0, 1);
-		String data_4_custom(F("{\"esp8266id\": \""));
+		
+		data_4_custom = F("{\"esp8266id\": \"");
 		data_4_custom += esp_chipid;
 		data_4_custom += "\", ";
 		data_4_custom += data_to_send;
-		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F("custom api: "));
+
 		sum_send_time += sendData(LoggerCustom, data_4_custom, 0, cfg::host_custom, cfg::url_custom);
 	}
 
 	if (cfg::send2csv)
 	{
-		debug_outln_info(F("## Sending as csv: "));
+		debug_outln_info(FPSTR(DBG_TXT_SENDING_TO), F(" Serial out as \"CSV\" format: "));
 		send_csv(data);
 	}
 
 #if defined(ESP8266)
-	// MQTT send process.
 	if (cfg::send2mqtt)
-	{
-		debug_out(String(DBG_TXT_SENDING_TO) + String("mqtt: "), DEBUG_MIN_INFO);
-		sum_send_time += sendmqtt(data);
+	{ // MQTT send process.
+		unsigned long  starttime_MQTT = millis();
+
+		debug_out(String(DBG_TXT_SENDING_TO) + String("mqtt: "), DEBUG_MAX_INFO);
+
+		data_sensemap.clear();
+		data_sensemap = data;
+
+		if (cfg::sen5x_read && !is_Sen5x_init_failed && memcmp(SEN5X_type, SENSOR_SEN55, 6) == 0)
+		{// Add VOC index to sensor MQTT send string.
+			data_sensemap.remove(data_sensemap.length() - 2);	// remove "]}"
+			data_sensemap += ',';
+
+			add_Value2Json(data_sensemap, FPSTR((String(F("SEN5X_")) + F("VOC")).c_str()), F("\nVOC: "), last_value_SEN5X_VOC);
+
+			data_sensemap.remove(data_sensemap.length() - 1);	// remove ','
+			data_sensemap += "]}";								// set JSON end chars.
+		}
+
+		sendmqtt(data_sensemap);
+
+		if (mqtt_client.connected())
+		{
+			mqtt_client.loop();
+		}
+
+		sum_send_time += millis() - starttime_MQTT;				//  micros() - starttime_MQTT;
 	}
 #endif
 
@@ -8246,7 +8601,7 @@ static unsigned long sendDataToOptionalApis(const String &data)
  *****************************************************************/
 void setup(void)
 {
-	Debug.begin(9600); 												// Output to Serial at 9600 baud
+	Debug.begin(9600); 												// Output to Hardware Serial at 9600 baud.
 
 #if defined(ESP8266)
 	esp_chipid = std::move(String(ESP.getChipId()));				// get MCU chip serial number.
@@ -8309,9 +8664,8 @@ void setup(void)
 		Debug.println("Read IPS... serialIPS 115200 8N1"); // will be set to 9600 8N1 afterwards
 		serialIPS.setTimeout(900);						   // Which timeout?
 	}
-	else
+	else if (cfg::sds_read)
 	{
-
 #if defined(ESP8266)
 		serialSDS.begin(9600, SWSERIAL_8N1, PM_SERIAL_RX, PM_SERIAL_TX);
 		serialSDS.enableIntTx(true);
@@ -8346,7 +8700,8 @@ void setup(void)
 	createLoggerConfigs();
 
 	debug_outln_info(F("\nChipId: "), esp_chipid);
-	debug_outln_info(F("\nMAC Id: "), esp_mac_id);
+	//debug_outln_info(F("\nMAC Id: "), esp_mac_id);
+	debug_outln_info(F("MAC Id: "), WiFi.macAddress() + String(F("\n")));
 
 #if defined(ESP8266)
 	if(cfg::send2mqtt)
@@ -8360,7 +8715,7 @@ void setup(void)
 			// implementation of MQTT communication.
 			setup_mqtt_broker( cfg::mqtt_server, cfg::mqtt_port);
 			RCWL0516.setMQTTClient(mqtt_client, mqtt_header, mqtt_lwt_header);
-			debug_outln_info(F("RCWL_0516 => set MQTT Client instance."));
+			debug_outln_info(F("RCWL_0516 => setup MQTT Client instance."));
 		}
 	}
 #endif
@@ -8443,7 +8798,7 @@ void loop(void)
 		sleep = 0;
 	}
 
-	// Wait at least 30s for each NTP server to sync
+	// Wait at least 30s for each NTP server to sync.
 	if (!sntp_time_set && send_now &&
 		msSince(time_point_device_start_ms) < 1000 * 2 * 30 + 5000)
 	{
@@ -8569,14 +8924,15 @@ void loop(void)
 
 	if ( (msSince(last_display_millis) > DISPLAY_UPDATE_INTERVAL_MS) &&
 		 (cfg::has_display || cfg::has_sh1106 || lcd_1602 || lcd_2004) )
-	{
+	{ // Update "OLED" Display lines.
 		display_values();
 		last_display_millis = act_milli;
 	}
 
 	server.handleClient();				// when a connection is make by iphone/tablet/... to the home webpage of sensor app.
 
-	yield();
+	yield();							// give waiting thread(s) CPU time.
+	delay(50);							// Bug - No web page.. connection timing problem (febr 2024)
 
 	if (send_now)
 	{
@@ -8622,40 +8978,41 @@ void loop(void)
 
 		if (cfg::sen5x_read && (!is_Sen5x_init_failed))
 		{
-			fetchSensorSEN5X(result); // edit and format sensor type/value for sending to webserver.
+			int pin;
+			RESERVE_STRING(resultTH, MED_STR);
 
+			fetchSensorSEN5X(result); // edit and format sensor type/value for sending to Sensor-Community webserver.
 			data += result;
 
-			if (memcmp(SEN5X_type, "SEN50", 6) == 0)
+			if( cfg::sen5x_pin16 )
 			{
-				sum_send_time += sendSensorCommunity(result, SEN5X_PM_API_PIN, FPSTR(SENSORS_SEN50), "SEN50_");
+				// Get only temperature and humidity.
+				fetchSensorSEN5X_THN(resultTH, false, false);
+				resultTH.replace("SEN5X", SENSOR_SEN55); // set 'SEN55' type ID.
+				result += resultTH;
+				pin = SEN5X_PM_API_PIN;
+			}
+			else
+			{
+				pin = SPS30_API_PIN;
 			}
 
-			if (memcmp(SEN5X_type, "SEN54", 6) == 0)
-			{
-				sum_send_time += sendSensorCommunity(result, SEN5X_PM_API_PIN, FPSTR(SENSORS_SEN54), "SEN54_");
-			}
-
-			if (memcmp(SEN5X_type, "SEN55", 6) == 0)
-			{
-				sum_send_time += sendSensorCommunity(result, SEN5X_PM_API_PIN, FPSTR(SENSORS_SEN55), "SEN55_");
-			}
+			sum_send_time += sendSensorCommunity(result, pin, FPSTR(SENSORS_SEN55), "SEN55_");
 
 			result = emptyString;
 
-			// Getting temperature and humidity.
-			debug_outln_info(FPSTR(DBG_TXT_SEP));
-
+			// Get temperature and humidity and NOx. for other API's
 			fetchSensorSEN5X_THN(result);
-
-			int pin = memcmp(cfg::sen5x_sym_th, "SCD30", 6) == 0 ? SEN5X_SCD30_TH_API_PIN : SEN5X_SHT35_TH_API_PIN;
-
 			data += result;
-			sum_send_time += sendSensorCommunity(result, pin, FPSTR(SENSORS_SEN5X_TH), "SEN5X_");
+
+			if( !cfg::sen5x_pin16 )
+			{
+				pin = memcmp(cfg::sen5x_sym_th, SENSOR_SCD30, 6) == 0 ? SEN5X_SCD30_TH_API_PIN : SEN5X_SHT3X_TH_API_PIN;
+				sum_send_time += sendSensorCommunity(result, pin, FPSTR(SENSORS_SEN5X_TH), "SEN5X_");
+			}
 
 			result = emptyString;
 
-			debug_outln_info(FPSTR(DBG_TXT_SEP));
 		}
 
 		if (cfg::sps30_read && (!sps30_init_failed))
@@ -8681,6 +9038,7 @@ void loop(void)
 		{
 			// getting temperature and humidity (optional)
 			fetchSensorHTU21D(result);
+			
 			data += result;
 			sum_send_time += sendSensorCommunity(result, HTU21D_API_PIN, FPSTR(SENSORS_HTU21D), "HTU21D_");
 			result = emptyString;
@@ -8690,6 +9048,7 @@ void loop(void)
 		{
 			// getting temperature and pressure (optional)
 			fetchSensorBMP(result);
+
 			data += result;
 			sum_send_time += sendSensorCommunity(result, BMP_API_PIN, FPSTR(SENSORS_BMP180), "BMP_");
 			result = emptyString;
@@ -8717,6 +9076,7 @@ void loop(void)
 		{
 			// getting temperature and humidity (optional)
 			fetchSensorSHT3x(result);
+
 			data += result;
 			sum_send_time += sendSensorCommunity(result, SHT3X_API_PIN, FPSTR(SENSORS_SHT3X), "SHT3X_");
 			result = emptyString;
@@ -8738,6 +9098,7 @@ void loop(void)
 		{
 			// getting temperature (optional)
 			fetchSensorDS18B20(result);
+
 			data += result;
 			sum_send_time += sendSensorCommunity(result, DS18B20_API_PIN, FPSTR(SENSORS_DS18B20), "DS18B20_");
 			result = emptyString;
@@ -8747,6 +9108,7 @@ void loop(void)
 		{
 			// getting noise measurement values from dnms (optional)
 			fetchSensorDNMS(result);
+
 			data += result;
 			sum_send_time += sendSensorCommunity(result, DNMS_API_PIN, FPSTR(SENSORS_DNMS), "DNMS_");
 			result = emptyString;
@@ -8772,22 +9134,24 @@ void loop(void)
 
 		data += "]}";						// set JSON end chars.
 
-		debug_outln_info(FPSTR(DBG_TXT_SEP));
-		Debug.println(data);				// print complete Json data string.
+		yield();							// give waiting thread(s) CPU time.
 
-		yield();							// give waiting threads CPU time.
-
-		// send to:
+		debug_outln_verbose(FPSTR(DBG_TXT_SEP));
+		debug_outln_verbose( F("Raw Sensor Data format for other Api's:\n"), data);	// Raw print complete Json data string.
+		//Debug.println(data);				
+	
+		// send to Optional Api's:
 		sum_send_time += sendDataToOptionalApis(data);
 		
-		debug_outln_info(FPSTR(DBG_TXT_SEP));
+		debug_outln_verbose(FPSTR(DBG_TXT_SEP));
 
-#if defined(ESP8266)
-		if (cfg::send2mqtt && mqtt_client.connected())
-		{
-			mqtt_client.loop();
-		}
-#endif
+//#if defined(ESP8266)
+		// this is moved to send2mqtt() function.
+		// if (cfg::send2mqtt && mqtt_client.connected())
+		// {
+		// 	mqtt_client.loop();
+		// }
+//#endif
 
 		// https://en.wikipedia.org/wiki/Moving_average#Cumulative_moving_average
 		sending_time = (3 * sending_time + sum_send_time) / 4;
@@ -8839,6 +9203,17 @@ void loop(void)
 		starttime = millis(); 					// store the start time.
 		count_sends++;
 	}
+	else
+	{
+		// time for a OTA attempt?
+		if (flg_OTAStartbyWebCall && sntp_time_set > 0)
+		{
+			debug_outln_info(F("Start OTA in LOOP()"));
+
+			StartTwoStageOTAUpdate();
+			flg_OTAStartbyWebCall = false;
+		}
+	}
 
 #if defined(ESP8266)
 	MDNS.update();
@@ -8855,10 +9230,21 @@ void loop(void)
 	{
 		if( cfg::send2mqtt && !mqtt_client.connected())
 		{// after x time MQTT connection will be lost wifi connection.... but why ????
-			debug_outln_info(F("** RCWL0516 => MQTT Broker connection lost.\nRetry......"));
-			//debug_outln_info(F("MQTT Broker connecting failed, state = "), String(mqtt_client.state()));
+			debug_outln_info(F("** RCWL0516 => MQTT Broker lost WIFI connection. **\nRetry......"));
 
 			setup_mqtt_broker( cfg::mqtt_server, cfg::mqtt_port);
+
+			// only for test, maybe FFU
+			// abonneer op MQTT broker via topic name: "LeusdenCentrum/airRohr-xxxxxxx/radar"
+			// if( mqtt_client.subscribe( (String(mqtt_header) + String("/radar")).c_str()))
+			// {
+			// 	String mesg = String(mqtt_header) + String("/radar");
+			// 	debug_outln_info(F("subscribe => OKAY, "),mesg);
+			// }
+			// else
+			// {
+			// 	debug_outln_info(F("subscribe => ERROR"));
+			// }
 		}
 
 		RCWL0516.loop();
@@ -8874,6 +9260,6 @@ void loop(void)
 
 	if (sample_count % 500 == 0)
 	{
-		//		Serial.println(ESP.getFreeHeap(),DEC);
+		//Serial.println(ESP.getFreeHeap(),DEC);
 	}
 } // end loop

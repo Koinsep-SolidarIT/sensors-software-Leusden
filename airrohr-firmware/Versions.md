@@ -1,3 +1,20 @@
+FWL-2024-03-B5_6
+* New ca-root certificate
+
+FWL-2024-03-B5
+* Add SEN5X pin-16 for sensor.community. (send format: PM, NC, TS, Temperature, Humidity)
+* For other API's see selection box "Emulate SEN5X-PM and -TH" prefix sensor ID (send format: PM, NC, TPS, VOC, NOx, Temperature, Humidity )
+* Add Language selection combox[EN,NL,DE,FR]
+* Add Auto update firware checkbox
+
+FWL-2024-03-B4
+* ADD OTA-firmware Update selectable by web-page. 
+* Add Option "CLIENTSECURE": select between use WiFiClientSecure or WiFiClient (default false) in OTA process.
+* (set in platformio.ini, section build_flags = -D CLIENTSECURE)
+
+FWL-2024-02-B2  (Fijnstof Werkgroep Leusden)
+* Add Temp/Hum SHT3X as SEN55 (needed for Madavi)
+
 FWL-2023-12-B1  (Fijnstof Werkgroep Leusden)
 * Change config web
 * add allways on SEN5X
