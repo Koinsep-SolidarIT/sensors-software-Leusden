@@ -23,11 +23,11 @@ The development is done in the beta branch.
 ## March 2024
 * Update ca-root certificat
 * Emulate SEN55 => SPS30 and SHT35 (Madavi.de / Feistaub-app / Openesensemap.org /sensor.community)
-* checkbox SEN55 on Pin 16 | sps30 PIN1 AND sht35 PIN7 (sensor.community)
+* Checkbox SEN55 on Pin 16 | sps30 PIN1 AND sht35 PIN7 (sensor.community)
 
 ## Directories 
 
-* /bin      - flasher (FlashESP8266) and firmware bin
+* /bin      - flasher (FlashESP8266) and firmware bin (firmware.zip)
 * /Doc      - manual/handleiding 
 * /Doc/PCB 	- schematic and Gerberfile
 
