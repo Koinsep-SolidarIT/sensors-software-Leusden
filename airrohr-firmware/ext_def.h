@@ -294,7 +294,7 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 #define SEN5X_READ 1                          // default: false
 #define SEN5X_PM_API_PIN 16                   // Pin 16 for SEN5X => PM / NCx and Temp, Humidity, (VOC, NOx. => NOT used)
                                               // Pin 1  for SPS30 =>  PM / NCx (VOC, NOx. => NOT used)
-#define SEN5X_ON 0                            // Default value for Start/Stop Fan motor.
+#define SEN5X_ON 1                            // Default value for Start/Stop Fan motor.
 #define SEN5X_SYM_TH "SHT3X"                  // temp, hum
 #define SEN5X_SYM_PM "SPS30"                  // PM0.5, PM1, PM2.5, PM4, PM10
 
@@ -385,5 +385,5 @@ static const char HOST_RADAR[] PROGMEM = "192.168.10.13";
 
 // Set debug level for serial output?
 // Default DEBUG level, DON'T change.
-#define DEBUG 6
+#define DEBUG 3
 
