@@ -68,6 +68,10 @@ namespace cfg {
 	int debug = DEBUG_MIN_INFO;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 /*****************************************************************
  * Debug output                                                  *
  *****************************************************************/
@@ -201,3 +205,5 @@ void loop() {
 
 	use_old_firmware = !use_old_firmware;
 }
+
+#pragma GCC diagnostic pop
