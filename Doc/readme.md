@@ -7,6 +7,6 @@ Box KSK100
 # Model 2
 
 ## PCB with SEN5X
-Box ksk80
+Box KSK80
 
 
