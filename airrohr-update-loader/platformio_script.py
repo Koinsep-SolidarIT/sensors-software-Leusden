@@ -1,6 +1,6 @@
 #
 # Copy from 
-#'../airrohr-firmware/platformio_script.py'
+# ../airrohr-Update-loader/platformio_script.py
 # 29-02-2024
 #
 
