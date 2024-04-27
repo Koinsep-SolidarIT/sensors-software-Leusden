@@ -1,4 +1,4 @@
-# airRohr Sensor Firmware for SPS30, SDS011, DHT22, BMP180, BMP/E 280 and many more
+# airRohr Sensor Firmware for SPS30, SDS011, SEN5x, DHT22, BMP180, BMP/E 280 and many more
 
 ## Features:
 * many environmental and air quality sensors can be used concurrently
@@ -171,3 +171,4 @@ by default when selecting the correct sensor model.
 * DNMS => Pin 15
 * SCD30 => Pin17
 * SEN5x => Pin 16
+* 
