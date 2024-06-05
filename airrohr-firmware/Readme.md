@@ -1,4 +1,4 @@
-# airRohr Sensor Firmware for SPS30, SDS011, DHT22, BMP180, BMP/E 280 and many more
+# airRohr Sensor Firmware for SPS30, SDS011, SEN5x, DHT22, BMP180, BMP/E 280 and many more
 
 ## Features:
 * many environmental and air quality sensors can be used concurrently
@@ -126,7 +126,7 @@ Pinout:
 * SCL  ->  Pin D4 (GPIO2)
 * SDA  ->  Pin D3 (GPIO0)
 
-### SPS30 (I2C, 5V)
+### SPS30, SEN5X (I2C, 5V)
 Pinout:
    1 2 3 4 5
 * Pin 1 (5V)     -> Pin VU/VIN
@@ -162,7 +162,7 @@ For use of multiple sensors with Sensor.Community (formerly Luftdaten.info), you
 the following API pins hardcoded. These match what the Sensor.Community API expect and will be used
 by default when selecting the correct sensor model.
 
-* HPM/PMS/SDS011/SPS30/SEN5x => Pin 1
+* HPM/PMS/SDS011/SPS30 => Pin 1
 * BME280 => Pin 11
 * BMP180/BMP280 => Pin 3
 * DHT22/HTU21D/SHT3x => Pin 7
@@ -170,4 +170,5 @@ by default when selecting the correct sensor model.
 * DS18B20 => Pin 13
 * DNMS => Pin 15
 * SCD30 => Pin17
+* SEN5x => Pin 16
 * 
