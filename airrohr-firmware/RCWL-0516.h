@@ -17,8 +17,6 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#include "./Queue.h"
-
 class RCWL_0516
 {
 
