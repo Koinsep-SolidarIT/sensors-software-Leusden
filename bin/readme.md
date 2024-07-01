@@ -1,7 +1,6 @@
 
 
 # airrohr-firmware
-* Note: config will be removed
 
 # Instruction for update 
 * Erase Flash (with Airrohr Flasher or FlashESP8266 see below)
