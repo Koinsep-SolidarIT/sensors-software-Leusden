@@ -1,6 +1,9 @@
 
 # Software for Sensor.Community / Luftdaten.Info Sensor
 
+![afbeelding](https://github.com/user-attachments/assets/9d71a39e-9e80-425a-a432-5dd19330daae)
+
+
 ## airrohr-firmware
 
 The maintained main firmware for the Luftdaten.Info Sensor. 
@@ -11,7 +14,7 @@ The development is done in the beta branch.
 
 ## New Sensors
 
-* SEN5XX
+* SEN5X
 * CO2 on SCD30
 
 ## Plugins
