@@ -46,8 +46,6 @@ https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
 ## Handleidingen NL
 
 https://github.com/FijnStofGroep/documenten
-* 
-https://www.cmlleusden.nl/handleidingen-fijnstofmeter.html
 
 ## Config SEN55 on opensensemap and sensorcommunity
 
@@ -56,3 +54,6 @@ Sensorcommunity PM is on PIN 1 and Temp/Hum is on PIN 7
 See example picture on WIKI
 
 https://github.com/FijnStofGroep/sensors-software-Leusden/wiki
+
+## Meer info werkgroep
+https://www.fijnstofleusden.nl
