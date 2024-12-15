@@ -9,6 +9,8 @@
 * Select com port
 * Select blank_4MB.bin to erase
 * Select firmware_xx.bin
+  
+![flasher](https://github.com/user-attachments/assets/af6156f5-6814-407e-b338-2ef44001b5fe)
 
 # This firmware has
 ## New Sensors
