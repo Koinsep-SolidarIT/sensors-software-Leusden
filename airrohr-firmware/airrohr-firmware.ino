@@ -7821,7 +7821,9 @@ static void init_display()
 {
 	if (cfg::has_display)
 	{
-		oled_ssd1306 = new SSD1306(0x3c, I2C_PIN_SDA, I2C_PIN_SCL);
+		//oled_ssd1306 = new SSD1306(0x3c, I2C_PIN_SDA, I2C_PIN_SCL);
+		// fix for SSD1306 OLED, SDA=GPIO14 SCL=GPIO12
+		oled_ssd1306 = new SSD1306(0x3c, 14, 12);
 		oled_ssd1306->init();
 
 		if (cfg::has_flipped_display)
