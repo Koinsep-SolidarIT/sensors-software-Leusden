@@ -5,9 +5,10 @@
  *                                                                      *
  ************************************************************************
  *                                                                      *
- *  airRohr firmware                                                    *
+ *  airRohr firmware:                                                   *
  *    Copyright (C) 2016-2021  Code for Stuttgart a.o.                  *
  *    Copyright (C) 2019-2020  Dirk Mueller                             *
+ *    Copyright (C) 2022-2025  R.Dieperink                              *
  *                                                                      *
  * This program is free software: you can redistribute it and/or modify *
  * it under the terms of the GNU General Public License as published by *
@@ -61,7 +62,6 @@
  * 2023-08-12															*
  * Add MQTT	RD/FvD														*
  * 2023-09-17															*
- * Add Simm7000 Webservice												*
  * Add WiFiMulti used to connect to a WiFi network with strongest 		*
  * WiFi signal (RSSI). 													*
  * 																		*
@@ -91,6 +91,12 @@
  * HARDWARE: ESP8266 160MHz, 80KB RAM, 4MB Flash						*
  * RAM:     [=====     ]  47.4% (used 38864 bytes from 81920 bytes)		*
  * PROGRAM: [======    ]  64.1% (used 669133 bytes from 1044464 bytes)	*
+ *                                                                      *
+ * latest build 2025-02-25												*
+ * PLATFORM: Espressif 8266 (3.0.0) > NodeMCU 1.0 (ESP-12E Module)		*
+ * HARDWARE: ESP8266 160MHz, 80KB RAM, 4MB Flash						*
+ * RAM:     [=====     ]  46.6% (used 38148 bytes from 81920 bytes)		*
+ * PROGRAM: [======    ]  63.2% (used 660425 bytes from 1044464 bytes)	*
  ************************************************************************/
 
 // VS: Convert Arduino file to C++ manually.
@@ -99,8 +105,15 @@
 #include <WString.h>
 #include <pgmspace.h>
 
-// increment on change
-#define SOFTWARE_VERSION_STR "FWL-2024-04-P5"
+// increment on change.
+#if defined(VS_DEBUG)
+// Debug / Beta version:
+ #define SOFTWARE_VERSION_STR "FWL-2025-01-B1"
+#else
+// Production / Release version:
+#define SOFTWARE_VERSION_STR "FWL-2025-03-P1"
+#endif
+
 String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 
 /*****************************************************************
@@ -110,8 +123,7 @@ String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 #include <FS.h> // must be first
 
 #include <ESP8266HTTPClient.h>
-//#include <ESP8266WiFi.h>
-#include <ESP8266WiFiMulti.h>
+#include <ESP8266WiFiMulti.h>       // #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <SoftwareSerial.h>
@@ -153,6 +165,7 @@ String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 #define ARDUINOJSON_ENABLE_ARDUINO_PRINT 0
 #define ARDUINOJSON_DECODE_UNICODE 0
 #include <ArduinoJson.h>
+
 #include <DNSServer.h>
 #include "./DHT.h"
 #include <Adafruit_HTU21DF.h>
@@ -163,7 +176,6 @@ String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 #include <SparkFun_SCD30_Arduino_Library.h>
 #include <SensirionI2CSen5x.h>
 #include <TinyGPS++.h>					//  Arduino library for parsing NMEA data streams provided by GPS modules. 
-#include <TinyGSM.h>
 
 // local/modified header files.
 #include "./bmx280_i2c.h"
@@ -174,8 +186,6 @@ String SOFTWARE_VERSION(SOFTWARE_VERSION_STR);
 //#include "defines.h"
 #include "ext_def.h"
 #include "html-content.h"
-#include "./airrohr-cfg7000.h"
-#include "./sim7000_html.h"
 #include "./RCWL-0516.h"
 
 // Temp language fields
@@ -227,10 +237,10 @@ namespace cfg
 	bool dht_read = DHT_READ;
 	bool htu21d_read = HTU21D_READ;
 	bool ppd_read = PPD_READ;
-	bool sds_read = SDS_READ;
+	bool sds_read = SDS_READ;                   // SDS011 PM sensor
 	bool pms_read = PMS_READ;
 	bool hpm_read = HPM_READ;
-	bool npm_read = NPM_READ;
+	bool npm_read = NPM_READ;                   // Tera NextPM sensor.
 	bool npm_fulltime = NPM_FULLTIME;
 	bool ips_read = IPS_READ;
 	bool sen5x_read = SEN5X_READ;
@@ -292,7 +302,6 @@ namespace cfg
 	char measurement_name_influx[LEN_MEASUREMENT_NAME_INFLUX];
 	bool ssl_influx = SSL_INFLUX;
 	bool has_fix_ip = HAS_FIX_IP;
-	bool has_s7000 = HAS_S7000;
 
 	char host_custom[LEN_HOST_CUSTOM];
 	char url_custom[LEN_URL_CUSTOM];
@@ -359,7 +368,6 @@ namespace cfg
 //*************************************************************************************************************************************************
 
 #define JSON_BUFFER_SIZE 3500					// 2300 -> 3500	=> increase: 11-11-2023
-#define JSON_BUFFER_SIZE_SIMM7000 500			// Simm7000 module settings.
 
 ESP8266WiFiMulti wifiMulti;
 
@@ -434,17 +442,14 @@ const uint8_t lcd_2004_columns = 20;
 const uint8_t lcd_2004_rows = 4;
 
 /*****************************************************************
- * Serial declarations                                           *
+ * Serial port declarations                                      *
  *****************************************************************/
 #if defined(ESP8266)
-SoftwareSerial serialSDS;
-SoftwareSerial *serialGPS;
-SoftwareSerial serialNPM;
-SoftwareSerial serialIPS;
+SoftwareSerial serialSDS;                   // Serial port to SDS011 sensor hardware.
+SoftwareSerial *serialGPS;                  // Serial port to GPS sensor hardware.
+SoftwareSerial serialNPM;                   // Serial port to Tera NextPM sensor hardware.
+SoftwareSerial serialIPS;                   // Serial port to IPS-7100 sensor hardware.
 
-SoftwareSerial serialSIM;
-TinyGsm        LTEmodem(serialSIM);
-//TinyGsmClient  LTEclient(LTEmodem);
 #endif
 
 #if defined(ESP32)
@@ -845,7 +850,6 @@ struct struct_wifiInfo
 };
 
 String json_config_memory_used;					// Status web
-String json_config7000_memory_used;				// Status web
 
 struct struct_wifiInfo *wifiInfo;
 uint8_t count_wifiInfo;
@@ -955,7 +959,7 @@ static String SDS_version_date()
 	if (cfg::sds_read && !last_value_SDS_version.length())
 	{
 		debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(DBG_TXT_SDS011_VERSION_DATE));
-		is_SDS_running = SDS_cmd(PmSensorCmd::Start);
+		is_SDS_running = SDS_sendCmd(PmSensorCmd::Start);
 		delay(250);
 
 #if defined(ESP8266)
@@ -965,8 +969,9 @@ static String SDS_version_date()
 		serialSDS.flush();
 
 		// Query Version/Date
-		SDS_rawcmd(0x07, 0x00, 0x00);
+		SDS_sendRawcmd(0x07, 0x00, 0x00);
 		delay(400);
+
 		const constexpr uint8_t header_cmd_response[2] = {0xAA, 0xC5};
 
 		while (serialSDS.find(header_cmd_response, sizeof(header_cmd_response)))
@@ -991,81 +996,88 @@ static String SDS_version_date()
 }
 
 /*****************************************************************
- * read Next PM sensor serial and firmware date                   *
+ * read Tera Next PM sensor serial and firmware date             *
  *****************************************************************/
 
-static uint8_t NPM_get_state()
+/// @brief 
+/// @return 
+static uint8_t NPM_get_State()
 {
+    debug_outln_info(F("State NPM..."));
+
 	uint8_t result = 0;
 	NPM_waiting_for_4 = NPM_REPLY_HEADER_4;
-	debug_outln_info(F("State NPM..."));
-	NPM_cmd(PmSensorCmd2::State);
+	NPM_sendCmd(PmSensorCmd2::State);
 
 	while (!serialNPM.available())
 	{
-		debug_outln("Wait for Serial...", DEBUG_MAX_INFO);
-	}
+		debug_outln("Wait for NPM-Serial...", DEBUG_MAX_INFO);
+    }
 
-	while (serialNPM.available() >= NPM_waiting_for_4)
-	{
-		const uint8_t constexpr header[2] = {0x81, 0x16};
-		uint8_t state[1];
-		uint8_t checksum[1];
-		uint8_t test[4];
+    const uint8_t constexpr header[2] = {0x81, 0x16};
+    uint8_t state[1];
+    uint8_t checksum[1];
+    uint8_t test[4];
 
-		switch (NPM_waiting_for_4)
+    while (serialNPM.available() >= NPM_waiting_for_4)
+    {
+        switch (NPM_waiting_for_4)
 		{
 		case NPM_REPLY_HEADER_4:
-			if (serialNPM.find(header, sizeof(header)))
+			if (serialNPM.find(header, sizeof(header)))         // Get header ID
+            {
 				NPM_waiting_for_4 = NPM_REPLY_STATE_4;
+            }
 			break;
 
 		case NPM_REPLY_STATE_4:
-			serialNPM.readBytes(state, sizeof(state));
-			NPM_state(state[0]);
+			serialNPM.readBytes(state, sizeof(state));          // read 1 byte (state) from receive stream.
+			get_NPM_State(state[0]);
 			result = state[0];
 			NPM_waiting_for_4 = NPM_REPLY_CHECKSUM_4;
 			break;
 
 		case NPM_REPLY_CHECKSUM_4:
-			serialNPM.readBytes(checksum, sizeof(checksum));
+			serialNPM.readBytes(checksum, sizeof(checksum));    // read 1 byte (CRC) from receive stream.
 			memcpy(test, header, sizeof(header));
 			memcpy(&test[sizeof(header)], state, sizeof(state));
 			memcpy(&test[sizeof(header) + sizeof(state)], checksum, sizeof(checksum));
 			NPM_data_reader(test, 4);
-			NPM_waiting_for_4 = NPM_REPLY_HEADER_4;
 
-			if (NPM_checksum_valid_4(test))
+			NPM_waiting_for_4 = NPM_REPLY_HEADER_4;
+			if (NPM_checksum_valid(test, 4))
 			{
 				debug_outln_info(F("Checksum OK..."));
 			}
 			break;
 		}
-	}
+    }
 
-	return result;
+    return result;
 }
 
+/// @brief 
+/// @return 
 static bool NPM_start_stop()
 {
 	bool result = false;
 	NPM_waiting_for_4 = NPM_REPLY_HEADER_4;
 	debug_outln_info(F("Switch start/stop NPM..."));
-	NPM_cmd(PmSensorCmd2::Change);
+	NPM_sendCmd(PmSensorCmd2::Change);
 
 	while (!serialNPM.available())
 	{
-		debug_outln("Wait for Serial...", DEBUG_MAX_INFO);
-	}
+		debug_outln("Wait for NPM-Serial...", DEBUG_MAX_INFO);
+    }
 
-	while (serialNPM.available() >= NPM_waiting_for_4)
-	{
-		const uint8_t constexpr header[2] = {0x81, 0x15};
-		uint8_t state[1];
-		uint8_t checksum[1];
-		uint8_t test[4];
+    const uint8_t constexpr header[2] = {0x81, 0x15};
+    uint8_t state[1];
+    uint8_t checksum[1];
+    uint8_t test[4];
 
-		switch (NPM_waiting_for_4)
+    while (serialNPM.available() >= NPM_waiting_for_4)
+    {
+        switch (NPM_waiting_for_4)
 		{
 		case NPM_REPLY_HEADER_4:
 			if (serialNPM.find(header, sizeof(header)))
@@ -1074,7 +1086,7 @@ static bool NPM_start_stop()
 
 		case NPM_REPLY_STATE_4:
 			serialNPM.readBytes(state, sizeof(state));
-			NPM_state(state[0]);
+			get_NPM_State(state[0]);
 
 			if (bitRead(state[0], 0) == 0)
 			{
@@ -1100,50 +1112,60 @@ static bool NPM_start_stop()
 			memcpy(&test[sizeof(header)], state, sizeof(state));
 			memcpy(&test[sizeof(header) + sizeof(state)], checksum, sizeof(checksum));
 			NPM_data_reader(test, 4);
+
 			NPM_waiting_for_4 = NPM_REPLY_HEADER_4;
-			if (NPM_checksum_valid_4(test))
+			if (NPM_checksum_valid(test,4))
 			{
 				debug_outln_info(F("Checksum OK..."));
 			}
+
 			result = true;
 			break;
 		}
-	}
+    }
 
-	return result; //ATTENTION
+    return result; //ATTENTION
 }
 
-static String NPM_version_date()
+/// @brief 
+/// Response:
+///         Address | Cmd code | State | Firmware version | Checksum
+///          0x81       0x17      0x00         0x0034         0x34
+/// @return 
+static String NPM_firmware_version()
 {
 	//debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(DBG_TXT_NPM_VERSION_DATE));
-	delay(250);
+    debug_outln_info(F("Version NPM..."));
+
 	NPM_waiting_for_6 = NPM_REPLY_HEADER_6;
-	debug_outln_info(F("Version NPM..."));
-	NPM_cmd(PmSensorCmd2::Version);
+	NPM_sendCmd(PmSensorCmd2::Version);
+	delay(250);
 
 	while (!serialNPM.available())
 	{
-		debug_outln("Wait for Serial...", DEBUG_MAX_INFO);
-	}
+		debug_outln("Wait for NPM-Serial...", DEBUG_MAX_INFO);
+    }
 
-	while (serialNPM.available() >= NPM_waiting_for_6)
-	{
-		const uint8_t constexpr header[2] = {0x81, 0x17};
-		uint8_t state[1];
-		uint8_t data[2];
-		uint8_t checksum[1];
-		uint8_t test[6];
+    const uint8_t constexpr header[2] = {0x81, 0x17};
+    uint8_t state[1];
+    uint8_t data[2];
+    uint8_t checksum[1];
+    uint8_t test[6];
 
-		switch (NPM_waiting_for_6)
+    while (serialNPM.available() >= NPM_waiting_for_6)
+    {
+        switch (NPM_waiting_for_6)
 		{
 		case NPM_REPLY_HEADER_6:
 			if (serialNPM.find(header, sizeof(header)))
+            {
 				NPM_waiting_for_6 = NPM_REPLY_STATE_6;
+            }
 			break;
 			
 		case NPM_REPLY_STATE_6:
 			serialNPM.readBytes(state, sizeof(state));
-			NPM_state(state[0]);
+			get_NPM_State(state[0]);
 			NPM_waiting_for_6 = NPM_REPLY_DATA_6;
 			break;
 
@@ -1156,6 +1178,7 @@ static String NPM_version_date()
 				//debug_outln_verbose(FPSTR(DBG_TXT_END_READING), FPSTR(DBG_TXT_NPM_VERSION_DATE));
 				debug_outln_info(F("Next PM Firmware: "), last_value_NPM_version);
 			}
+
 			NPM_waiting_for_6 = NPM_REPLY_CHECKSUM_6;
 			break;
 
@@ -1166,103 +1189,113 @@ static String NPM_version_date()
 			memcpy(&test[sizeof(header) + sizeof(state)], data, sizeof(data));
 			memcpy(&test[sizeof(header) + sizeof(state) + sizeof(data)], checksum, sizeof(checksum));
 			NPM_data_reader(test, 6);
+
 			NPM_waiting_for_6 = NPM_REPLY_HEADER_6;
-			if (NPM_checksum_valid_6(test))
+			if (NPM_checksum_valid(test, sizeof(test)))
 			{
 				debug_outln_info(F("Checksum OK..."));
 			}
+
 			break;
 		}
-	}
-	return last_value_NPM_version;
+    }
+
+    return F("Tera NextPM Version: ") + last_value_NPM_version;
 }
 
-#pragma GCC diagnostic ignored "-Wunused-function"
-/*
-*
-*/
-static void NPM_fan_speed()
-{
-	NPM_waiting_for_5 = NPM_REPLY_HEADER_5;
-	debug_outln_info(F("Set fan speed to 50 %..."));
-	NPM_cmd(PmSensorCmd2::Speed);
+//#pragma GCC diagnostic ignored "-Wunused-function"
 
-	while (!serialNPM.available())
-	{
-		debug_outln("Wait for Serial...", DEBUG_MAX_INFO);
-	}
+/// @brief 
+// static void NPM_fan_speed()
+// {
+//     debug_outln_info(F("Set fan speed to 50 %..."));
 
-	while (serialNPM.available() >= NPM_waiting_for_5)
-	{
-		const uint8_t constexpr header[2] = {0x81, 0x21};
-		uint8_t state[1];
-		uint8_t data[1];
-		uint8_t checksum[1];
-		uint8_t test[5];
+// 	NPM_waiting_for_5 = NPM_REPLY_HEADER_5;
+// 	NPM_sendCmd(PmSensorCmd2::Speed);
 
-		switch (NPM_waiting_for_5)
-		{
-		case NPM_REPLY_HEADER_5:
-			if (serialNPM.find(header, sizeof(header)))
-				NPM_waiting_for_5 = NPM_REPLY_STATE_5;
-			break;
+// 	while (!serialNPM.available())
+// 	{
+//         debug_outln("Wait for NPM-Serial...", DEBUG_MAX_INFO);
+//     }
 
-		case NPM_REPLY_STATE_5:
-			serialNPM.readBytes(state, sizeof(state));
-			NPM_state(state[0]);
-			NPM_waiting_for_5 = NPM_REPLY_DATA_5;
-			break;
+//     const uint8_t constexpr header[2] = {0x81, 0x21};
+//     uint8_t state[1];
+//     uint8_t data[1];
+//     uint8_t checksum[1];
+//     uint8_t test[5];
 
-		case NPM_REPLY_DATA_5:
-			if (serialNPM.readBytes(data, sizeof(data)) == sizeof(data))
-			{
-				NPM_data_reader(data, 1);
-			}
-			NPM_waiting_for_5 = NPM_REPLY_CHECKSUM_5;
-			break;
+//     while (serialNPM.available() >= NPM_waiting_for_5)
+//     {
+//         switch (NPM_waiting_for_5)
+// 		{
+// 		case NPM_REPLY_HEADER_5:
+// 			if (serialNPM.find(header, sizeof(header)))
+// 				NPM_waiting_for_5 = NPM_REPLY_STATE_5;
+// 			break;
 
-		case NPM_REPLY_CHECKSUM_5:
-			serialNPM.readBytes(checksum, sizeof(checksum));
-			memcpy(test, header, sizeof(header));
-			memcpy(&test[sizeof(header)], state, sizeof(state));
-			memcpy(&test[sizeof(header) + sizeof(state)], data, sizeof(data));
-			memcpy(&test[sizeof(header) + sizeof(state) + sizeof(data)], checksum, sizeof(checksum));
-			NPM_data_reader(test, 5);
-			NPM_waiting_for_5 = NPM_REPLY_HEADER_5;
-			if (NPM_checksum_valid_5(test))
-			{
-				debug_outln_info(F("Checksum OK..."));
-			}
-			break;
-		}
-	}
-}
+// 		case NPM_REPLY_STATE_5:
+// 			serialNPM.readBytes(state, sizeof(state));
+// 			get_NPM_State(state[0]);
+// 			NPM_waiting_for_5 = NPM_REPLY_DATA_5;
+// 			break;
 
-#pragma GCC diagnostic pop
+// 		case NPM_REPLY_DATA_5:
+// 			if (serialNPM.readBytes(data, sizeof(data)) == sizeof(data))
+// 			{
+// 				NPM_data_reader(data, 1);
+// 			}
+// 			NPM_waiting_for_5 = NPM_REPLY_CHECKSUM_5;
+// 			break;
 
+// 		case NPM_REPLY_CHECKSUM_5:
+// 			serialNPM.readBytes(checksum, sizeof(checksum));
+// 			memcpy(test, header, sizeof(header));
+// 			memcpy(&test[sizeof(header)], state, sizeof(state));
+// 			memcpy(&test[sizeof(header) + sizeof(state)], data, sizeof(data));
+// 			memcpy(&test[sizeof(header) + sizeof(state) + sizeof(data)], checksum, sizeof(checksum));
+// 			NPM_data_reader(test, 5);
 
+// 			NPM_waiting_for_5 = NPM_REPLY_HEADER_5;
+// 			if (NPM_checksum_valid(test,5))
+// 			{
+// 				debug_outln_info(F("Checksum OK..."));
+// 			}
+// 			break;
+// 		}
+//     }
+// }
+
+// #pragma GCC diagnostic pop
+
+/// @brief raw temperature and relative humidity values
+///   Sample:
+///      Temperature = 0x0B40 which is 2880 in decimal. 
+///                    After dividing by 100, the physical value is 28.80 °C.
+///                    Same calculation should be applied for calculating physical relative humidity.
+/// @return 
 static String NPM_temp_humi()
 {
+    debug_outln_info(F("Temperature/Humidity in Next PM..."));
 	uint16_t NPM_temp = 0;
 	uint16_t NPM_humi = 0;
 	NPM_waiting_for_8 = NPM_REPLY_HEADER_8;
-	debug_outln_info(F("Temperature/Humidity in Next PM..."));
 
-	NPM_cmd(PmSensorCmd2::Temphumi);
+	NPM_sendCmd(PmSensorCmd2::Temphumi);
+
 	while (!serialNPM.available())
 	{
-		debug_outln("Wait for Serial...", DEBUG_MAX_INFO);
-	}
+		debug_outln("Wait for NPM-Serial...", DEBUG_MAX_INFO);
+    }
 
-	while (serialNPM.available() >= NPM_waiting_for_8)
-	{
-		const uint8_t constexpr header[2] = {0x81, 0x14};
-		uint8_t state[1];
-		uint8_t data[4];
-		uint8_t checksum[1];
-		uint8_t test[8];
+    const uint8_t constexpr header[2] = {0x81, 0x14};
+    uint8_t state[1];
+    uint8_t data[4];
+    uint8_t checksum[1];
+    uint8_t test[8];
 
-		switch (NPM_waiting_for_8)
+    while (serialNPM.available() >= NPM_waiting_for_8)
+    {
+        switch (NPM_waiting_for_8)
 		{
 		case NPM_REPLY_HEADER_8:
 			if (serialNPM.find(header, sizeof(header)))
@@ -1271,7 +1304,7 @@ static String NPM_temp_humi()
 
 		case NPM_REPLY_STATE_8:
 			serialNPM.readBytes(state, sizeof(state));
-			NPM_state(state[0]);
+			get_NPM_State(state[0]);
 			NPM_waiting_for_8 = NPM_REPLY_BODY_8;
 			break;
 
@@ -1285,6 +1318,7 @@ static String NPM_temp_humi()
 				debug_outln_verbose(F("Temperature (°C): "), String(NPM_temp / 100.0f));
 				debug_outln_verbose(F("Relative humidity (%): "), String(NPM_humi / 100.0f));
 			}
+
 			NPM_waiting_for_8 = NPM_REPLY_CHECKSUM_8;
 			break;
 
@@ -1295,7 +1329,8 @@ static String NPM_temp_humi()
 			memcpy(&test[sizeof(header) + sizeof(state)], data, sizeof(data));
 			memcpy(&test[sizeof(header) + sizeof(state) + sizeof(data)], checksum, sizeof(checksum));
 			NPM_data_reader(test, 8);
-			if (NPM_checksum_valid_8(test))
+
+			if (NPM_checksum_valid( &test[0],8))
 			{
 				debug_outln_info(F("Checksum OK..."));
 			}
@@ -1303,21 +1338,35 @@ static String NPM_temp_humi()
 			NPM_waiting_for_8 = NPM_REPLY_HEADER_8;
 			break;
 		}
-	}
+    }
 
-	return String(NPM_temp / 100.0f) + " / " + String(NPM_humi / 100.0f);
+    return String(NPM_temp / 100.0f) + " / " + String(NPM_humi / 100.0f);
 }
 
-/*****************************************************************
- * read IPS-7100 sensor serial and firmware date                   *
-*****************************************************************/
+/// TODO:  Writing command list
+/* 
+        Cmd code | Description                | full command
+        -------------------------------------------------------
+          0x15     Sleep mode entry / exit (1)  0x81 0x15 0x6A
+          0x41     Heater OFF (0%)              0x81 0x41 0x3E
+          0x42     Heater ON (100%)             0x81 0x42 0x3D
+          0x43     Automatic heater regulation  0x81 0x43 0x3C
+ */
 
+
+
+/*****************************************************************
+ * read IPS-7100 sensor serial and firmware date                 *
+******************************************************************/
+
+/// @brief 
+/// @return 
 static String IPS_version_date()
 {
 	debug_outln_info(F("Version IPS..."));
 	String serial_data;
 
-	IPS_cmd(PmSensorCmd3::Reset);
+	IPS_sendCmd(PmSensorCmd3::Reset);
 
 	if (serialIPS.available() > 0)
 	{
@@ -1338,7 +1387,6 @@ static String IPS_version_date()
 
 	return last_value_IPS_version;
 }
-
 
 /*****************************************************************
  * read SEN5X sensor serial and firmware date                    *
@@ -1458,8 +1506,6 @@ static void readConfig(bool oldconfig = false)
 	//debug_outln_info(F("*** call readConfigBase()... ***"));
 	readConfigBase( oldconfig);
 
-	//debug_outln_info(F("*** call readConfigS7000()... ***"));
-	readConfigS7000( oldconfig);
 }
 
 /*****************************************************************
@@ -1634,123 +1680,6 @@ static void readConfigBase(bool oldconfig)
 
 /*****************************************************************
 /// @brief 
-/// Read config S7000 data from SPIFFS E-memory.
-/// @param oldconfig
-******************************************************************/
-static void readConfigS7000(bool oldconfig)
-{
-	bool rewriteConfig = false;
-
-	String cfgName(F("/simm7000.json"));
-
-	if (oldconfig)
-	{
-		cfgName += F("/simm7000.json.old");
-	}
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
-	File configFile= SPIFFS.open(cfgName, "r");
-
-	if (!configFile)
-	{
-		if (!oldconfig)
-		{	// call 
-			return readConfigS7000(true /* configFile */);
-		}
-
-		debug_outln_error(F("Failed to open config S7000 file."));
-		return;
-	}
-
-	debug_outln_info(F("Opened config S7000 file..."));
-
-	DynamicJsonDocument json(JSON_BUFFER_SIZE_SIMM7000);
-	DeserializationError err = deserializeJson(json, configFile.readString());
-
-	debug_outln_info(F("Read JSON S7000 format.....\nJson memory size: "), String(json.memoryUsage()) + 
-					 F(" | Elementen in array: ") + String(json.size()) + 
-					 F(" | Error Code = ") + err.code() + F(" => ") + err.f_str() );
-
-	json_config7000_memory_used = String(json.memoryUsage());
-
-	configFile.seek(0);				// set file pointer back to begin file.
-	debug_outln_verbose(F("Read(): Config file content: ***\n"), configFile.readString() + String("\n***") );
-	configFile.close();
-
-	if (err.code() == DeserializationError::InvalidInput)
-	{// Check Json string
-		String json_string;
-		serializeJson(json, json_string);
-		debug_outln_verbose(F("readConfig():Parse => [JSON] input: \n"), json_string.c_str());
-
-		if (json_string.startsWith("{") && json_string.endsWith("}"))
-		{ // still a good Json format
-			err = DeserializationError(DeserializationError::Ok);
-		}
-	}
-
-#pragma GCC diagnostic pop
-
-	if ( !err )
-	{
-		serializeJsonPretty(json, Debug);					// display all members + value of config file.
-		debug_outln_info(F("\nparsed json7...\nJson memory size: "), String(json.memoryUsage()) + String(" char."));
-
-		// "configShape" memory array[], defined in airrohr-cfg.h
-		for (unsigned e = 0; e < sizeof(configShape7) / sizeof(configShape7[0]); ++e)
-		{
-			Config7000ShapeEntry c;
-			memcpy_P(&c, &configShape7[e], sizeof(Config7000ShapeEntry));
-
-			if (json[c.cfg_key()].isNull())
-			{
-				debug_outln_info(F("Key NOT in configration file:..."), FPSTR(c.cfg_key()));
-				continue;
-			}
-
-			switch (c.cfg_type)
-			{
-				case Config7_Type_Bool:
-					*(c.cfg_val.as_bool) = boolFromJSON(json, c.cfg_key());
-					break;
-
-				case Config7_Type_UInt:
-					*(c.cfg_val.as_uint) = json[c.cfg_key()].as<unsigned int>();
-					break;
-
-				case Config7_Type_String:
-					strncpy(c.cfg_val.as_str, json[c.cfg_key()].as<const char *>(), c.cfg_len);
-					c.cfg_val.as_str[c.cfg_len] = '\0';			// set terminator char.
-					break;
-			};
-		}
-	}
-	else
-	{
-		debug_outln_error(F("failed to load JSON S7000 config"));
-
-		if (!oldconfig)
-		{
-			debug_outln_error(F("Simm7000 -return readConfig(true /* oldconfig */"));
-			return readConfigS7000(true /* oldconfig */);
-		}
-	}
-
-// End Simm7000
-
-	if (rewriteConfig)
-	{
-		writeConfigS7000();
-	}
-
-	debug_outln_info(F("Exit: readConfigS7000() methode."));
-	
-}	// readConfigS7000()
-
-/*****************************************************************
-/// @brief 
 /// Init config data from SPIFFS E-memory.
 /// @param None
 ******************************************************************/
@@ -1816,7 +1745,6 @@ static void init_config()
 static bool writeConfig()
 {
 	bool ret = writeConfigBase();
-	ret |= writeConfigS7000();
 
 	return ret;
 }
@@ -1890,82 +1818,6 @@ static bool writeConfigBase()
 
 	return true;
 }
-
-/*****************************************************************
- * write config to spiffs                                        *
- *****************************************************************/
-static bool writeConfigS7000()
-{
-	DynamicJsonDocument json(JSON_BUFFER_SIZE_SIMM7000);
-
-	debug_outln_info(F("Saving S7000 config..."));
-
-	for (unsigned e = 0; e < sizeof(configShape7) / sizeof(configShape7[0]); ++e)
-	{
-		Config7000ShapeEntry c;
-		memcpy_P(&c, &configShape7[e], sizeof(Config7000ShapeEntry));
-
-		switch (c.cfg_type)
-		{
-			case Config7_Type_Bool:
-				json[c.cfg_key()].set(*c.cfg_val.as_bool);
-				break;
-
-			case Config7_Type_UInt:
-				json[c.cfg_key()].set(*c.cfg_val.as_uint);
-				break;
-
-			case Config7_Type_String:
-				json[c.cfg_key()].set(c.cfg_val.as_str);
-				break;
-		};
-	}
-
-	// debug_outln_info(F("JSON 7000 format.....\nJson memory size: "), String(json.memoryUsage()) + 
-	// 				 " | Elementen in array: " + String(json.size()));
-
-  	// String json_string;
-  	// serializeJson(json, json_string);
-	// debug_outln_info(F("writeConfigS7000() => [JSON] format: \n"), json_string.c_str());
-
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
-
-	SPIFFS.remove(F("/simm7000.json.old"));
-	SPIFFS.rename(F("/simm7000.json"), F("/simm7000.json.old"));
-
-	File configFile = SPIFFS.open(F("/simm7000.json"), "w");
-
-	if (configFile)
-	{
-		// write JSON content into configfile.
-		serializeJson(json, configFile);
-		
-		debug_outln_info(F("Wait 2 second, before close Config file."));
-		delay(2000);
-		configFile.close();
-
-		debug_outln_info(F("Write JSON 7000 format.....\nJson memory size: "), String(json.memoryUsage()) + 
-					 	 F(" | Elementen in array: ") + String(json.size()) +
-						 F("\nConfig written successfully."));
-
-		String json_string;
-  		serializeJson(json, json_string);
-		debug_outln_info(F("writeConfigS7000() => [JSON] S7000 format: \n"), json_string.c_str());
-	}
-	else
-	{
-		debug_outln_error(F("writeConfigS7000():failed to open config S7000 file for writing"));
-		return false;
-	}
-
-#pragma GCC diagnostic pop
-
-	return true;
-}
-
 
 /*****************************************************************
  * Prepare information for data Loggers                          *
@@ -2340,19 +2192,11 @@ static void webserver_root()
 		debug_outln_info(F("ws: root ..."));
 
 		// Enable Pagination
-		if (cfg::has_s7000)
-		{
-		 	page_content += FPSTR(WEB_ROOT_PAGE_CONTENT_S7000);
-		}
-		else
-		{
-		 	page_content += FPSTR(WEB_ROOT_PAGE_CONTENT);	
-		}
+		page_content += FPSTR(WEB_ROOT_PAGE_CONTENT);	
 
 		page_content.replace(F("{t}"), FPSTR(INTL_CURRENT_DATA));
 		page_content.replace(F("{s}"), FPSTR(INTL_DEVICE_STATUS));
 		page_content.replace(F("{conf}"), FPSTR(INTL_CONFIGURATION));
-		page_content.replace(F("{s7000}"), FPSTR(INTL_SIM7000_CONFIGURATION));
 		page_content.replace(F("{restart}"), FPSTR(INTL_RESTART_SENSOR));
 		page_content.replace(F("{debug}"), FPSTR(INTL_DEBUG_LEVEL));
 		page_content.replace(F("{update}"), FPSTR(INTL_UPDATE_FIRMWARE));
@@ -2452,9 +2296,6 @@ static void webserver_config_send_body_get(String &page_content)
 
 	page_content = FPSTR(WEB_BR_LF);
 	page_content += F("<hr/>");
-	//page_content += FPSTR(WEB_BR_LF);
-	add_form_checkbox(Config_has_s7000, FPSTR(INTL_ENABLE_S7000));
-	page_content += FPSTR(WEB_BR_LF);
 	add_form_checkbox(Config_has_radarmotion, FPSTR(INTL_ENABLE_RCWL_0516));
 
 	if (cfg::has_radarmotion)
@@ -2748,97 +2589,6 @@ static void webserver_config_send_body_post(String &page_content)
 	page_content = emptyString;
 }
 
-/*****************************************************************
- * Webserver sim7000 config: show sim7000 config page            *
- *****************************************************************/
-static void webserver_config_send_body_get7(String &page_content)
-{
-	// auto add_form_checkbox7 = [&page_content](const ConfigShape7Id cfgid, const String &info)
-	// {
-	// 	page_content += form_checkbox7(cfgid, info, true);
-	// };
-
-	// auto add_form_checkbox_sensor7 = [&add_form_checkbox7](const ConfigShape7Id cfgid, __const __FlashStringHelper *info)
-	// {
-	// 	add_form_checkbox7(cfgid, add_sensor_type(info));
-	// };
-
-	debug_outln_info(F("begin webserver_simm7000_body_get ..."));
-	debug_outln_info(F("SIM7000 enable: "), cfg::has_s7000);
-
-	page_content += F("<form method='POST' action='/s7000' style='width:100%;'>\n");
-	page_content += FPSTR(WEB_BR_BR);
-	page_content += FPSTR(TABLE_TAG_OPEN);
-	// add_form_input7(page_content, Config7000_mode, FPSTR(INTL_SIM_MODE), LEN_SIMM7000 - 1);
-	add_form_input7(page_content, Config7000_apn, FPSTR(INTL_SIM_APN), LEN_SIMM7000 - 1);
-	add_form_input7(page_content, Config7000_type, FPSTR(INTL_SIM_TYPE), LEN_SIMM7000 - 1);
-	page_content += form_select_mode7();
-	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
-	page_content += FPSTR(WEB_BR_BR);
-	page_content += form_checkbox7(Config7000_has_gps, FPSTR(INTL_SIM_GPS), false);
-	page_content += F("</div></div>");
-	page_content += form_submit(FPSTR(INTL_SAVE_AND_RESTART));
-	page_content += FPSTR(WEB_BR_FORM);
-
-	debug_outln_info(F("End webserver_simm7000 ..."));
-
-	server.sendContent(page_content);
-
-	page_content = emptyString;
-}
-
-/*********************************************************************************************
- * Webserver sim7000 config: post the changed page to sim7000 config file and restart appl.  *
- *********************************************************************************************/
-static void webserver_config_send_body_post7(String &page_content)
-{
-	String masked_pwd;
-
-	for (unsigned e = 0; e < sizeof(configShape7) / sizeof(configShape7[0]); ++e)
-	{
-		Config7000ShapeEntry c;
-		memcpy_P(&c, &configShape7[e], sizeof(Config7000ShapeEntry));
-		const String s_param(c.cfg_key());
-
-		if (!server.hasArg(s_param))
-		{
-			continue;
-		}
-
-		const String server_arg(server.arg(s_param));
-
-		switch (c.cfg_type)
-		{
-		case Config7_Type_UInt:
-			*(c.cfg_val.as_uint) = server_arg.toInt();
-			break;
-
-		case Config7_Type_Bool:
-			*(c.cfg_val.as_bool) = (server_arg == "1");
-			break;
-
-		case Config7_Type_String:
-			strncpy(c.cfg_val.as_str, server_arg.c_str(), c.cfg_len);
-			c.cfg_val.as_str[c.cfg_len] = '\0';
-			break;
-
-	/*	case Config7_Type_Password:
-			if (server_arg.length())
-			{
-				server_arg.toCharArray(c.cfg_val.as_str, LEN_CFG_PASSWORD);
-			}
-			break;
-	*/
-		}
-
-	}
-
-	page_content += FPSTR(INTL_SENSOR_IS_REBOOTING);
-
-	server.sendContent(page_content);
-	page_content = emptyString;
-}
-
 /****************************************************
  *	Write webside settings into Config file. 		*
 *****************************************************/
@@ -2899,69 +2649,6 @@ static void webserver_config()
 	}
 }
 
-/*
-	Write webside settings into ConfigS7000 file.
-*/
-static void webserver_config7()
-{
-	if (!webserver_request_auth())
-	{
-		return;
-	}
-
-	debug_outln_info(F("ws: config page S7000..."));
-
-	server.sendHeader(F("Cache-Control"), F("no-cache, no-store, must-revalidate"));
-	server.sendHeader(F("Pragma"), F("no-cache"));
-	server.sendHeader(F("Expires"), F("0"));
-	// Enable Pagination (Chunked Transfer)
-	server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-
-	RESERVE_STRING(page_content, XLARGE_STR);
-
-	start_html_page(page_content, FPSTR(INTL_CONFIGURATION));
-
-	if (wificonfig_loop)
-	{ // scan for wlan ssids
-		page_content += FPSTR(WEB_CONFIG_SCRIPT);
-	}
-
-	if (server.method() == HTTP_GET)
-	{
-		debug_outln_info(F("HTTP_GET"));
-		webserver_config_send_body_get7(page_content);
-
-	}
-	else
-	{
-		debug_outln_info(F("HTTP_POST7"));
-		webserver_config_send_body_post7(page_content);
-	}
-
-	end_html_page(page_content);
-
-	if (server.method() == HTTP_POST)
-	{
-		display_debug(F("Writing config"), emptyString);
-
-		if (cfg::has_radarmotion)
-		{
-			debug_outln_info(F("STOP Radar motion sensor (RCWL_0516) process."));
-			RCWL0516.end();
-		}
-
-		if (writeConfig())
-		{ // TODO: devide in two section to know which writeconfig has a error.
-			display_debug(F("Writing config"), F("and restarting"));
-			sensor_restart();
-		}
-		else
-		{
-			display_debug(F("ERROR Writing config"), F("For restart Power OFF/ON"));
-		}
-	}
-}
-
 /// @brief 
 /// sensor will be restart after:
 ///			- some time
@@ -2988,7 +2675,8 @@ static void sensor_restart()
 	{
 		serialNPM.end();
 	}
-	else
+    
+	if (cfg::sds_read)
 	{
 		serialSDS.end();
 	}
@@ -3454,7 +3142,6 @@ static void webserver_status()
 	add_table_row_from_value(page_content, FPSTR(INTL_FIRMWARE), versionHtml);
 	add_table_row_from_value(page_content, F("Free Memory"), String(ESP.getFreeHeap()));
 	add_table_row_from_value(page_content, F("Used json.config (used/max)"), String(json_config_memory_used) + String(" / ") + String(JSON_BUFFER_SIZE)+ String("  char") );
-	add_table_row_from_value(page_content, F("Used Simm7000.config (used/max)"), String(json_config7000_memory_used) + String(" / ") + String(JSON_BUFFER_SIZE_SIMM7000) + String("  char") );
 	
 #if defined(ESP8266)
 	add_table_row_from_value(page_content, F("Heap Fragmentation"), String(ESP.getHeapFragmentation()), "%");
@@ -3990,7 +3677,6 @@ static void setup_webserver()
 {
 	server.on("/", webserver_root);
 	server.on(F("/config"), webserver_config);
-	server.on(F("/s7000"), webserver_config7);
 	server.on(F("/wifi"), webserver_wifi);
 	server.on(F("/values"), webserver_values);
 	server.on(F("/status"), webserver_status);
@@ -4297,7 +3983,6 @@ static void wifiConfig()
 	debug_outln_info_bool(F("MQTT: "), cfg::send2mqtt);
 	debug_outln_info_bool(F("Fix IP address: "), cfg::has_fix_ip);
 	debug_outln_info(FPSTR(DBG_TXT_SEP));
-	debug_outln_info_bool(F("SIMM-7000: "), cfg::has_s7000);
 	debug_outln_info_bool(F("RCWL-0516: "), cfg::has_radarmotion);
 	debug_outln_info(FPSTR(DBG_TXT_SEP));
 	debug_outln_info_bool(F("Autoupdate: "), cfg::auto_update);
@@ -4549,57 +4234,6 @@ static WiFiClient *getNewLoggerWiFiClient(const LoggerEntry logger)
 	}
 
 	return _client;
-}
-
-/*
-	ESP8266 serial speed to SIM7000 = Default baud rate is 115200 bps
-
-	NOTE: Software serial is not reliable on 115200 baud and therefore changes it to a lower value. 
-		  9600 works well in almost all applications, but 115200 works great with Hardware serial.
-*/
-static boolean SIM700LTEConnect() 
-{
-	debug_outln_info(F("SIM700 Connecting to "), String(cfg::wlanssid));	// ???
-
-	pinMode(SIM_PIN_PWR, OUTPUT);						// Set Power-On/Off SIM7000 board.
-
-	serialSIM.begin(SERIALSIM_BAUD, SWSERIAL_8N1, SIM_PIN_RX, SIM_PIN_TX);	// start with default SIM7000 shield baud rate.
-	delay(100);
-	LTEmodem.setBaud(LTEMODEM_BAUD);					// Set LTEmodem baud rate to lower value.
-	delay(100);
-	serialSIM.begin(LTEMODEM_BAUD, SWSERIAL_8N1);		// set same baud value for SIM7000 shield.
-
-	// Restart takes internal quite some time.
-	//LTEmodem.restart();
-  	// To skip it, call init() instead of restart()
-  	LTEmodem.init();
-
-	String modemInfo = LTEmodem.getModemInfo();
-  	debug_outln_info(F("LTE Modem Info: "), modemInfo);
-
-	// Your GPRS credentials, if any
-	const char apn[]      = "YourAPN";
-	const char gprsUser[] = "";
-	const char gprsPass[] = "";
-
-	LTEmodem.gprsConnect(apn, gprsUser, gprsPass);
-
-	debug_outln_info(F("Waiting for network..."),"");
-	if (!LTEmodem.waitForNetwork())
-	{
-		display_debug(F(" fail"),"");
-		//delay(10000);
-		return false;
-	}
-
-	debug_outln_info(F(" success"),"");
-
-	if (LTEmodem.isGprsConnected())
-	{
-		debug_outln_info(F("GPRS connected."),"");
-	}
-
-	return true;
 }
 
 /*****************************************************************
@@ -5214,14 +4848,14 @@ static void fetchSensorSDS(String &s)
 	{
 		if (is_SDS_running)
 		{
-			is_SDS_running = SDS_cmd(PmSensorCmd::Stop);
+			is_SDS_running = SDS_sendCmd(PmSensorCmd::Stop);
 		}
 	}
 	else
 	{
 		if (!is_SDS_running)
 		{
-			is_SDS_running = SDS_cmd(PmSensorCmd::Start);
+			is_SDS_running = SDS_sendCmd(PmSensorCmd::Start);
 			SDS_waiting_for = SDS_REPLY_HDR;
 		}
 
@@ -5318,7 +4952,7 @@ static void fetchSensorSDS(String &s)
 
 			if (is_SDS_running)
 			{
-				is_SDS_running = SDS_cmd(PmSensorCmd::Stop);
+				is_SDS_running = SDS_sendCmd(PmSensorCmd::Stop);
 			}
 		}
 	}
@@ -5346,14 +4980,14 @@ static __noinline void fetchSensorPMS(String &s)
 	{
 		if (is_PMS_running)
 		{
-			is_PMS_running = PMS_cmd(PmSensorCmd::Stop);
+			is_PMS_running = PMS_sendCmd(PmSensorCmd::Stop);
 		}
 	}
 	else
 	{
 		if (!is_PMS_running)
 		{
-			is_PMS_running = PMS_cmd(PmSensorCmd::Start);
+			is_PMS_running = PMS_sendCmd(PmSensorCmd::Start);
 		}
 
 		while (serialSDS.available() > 0)
@@ -5509,7 +5143,7 @@ static __noinline void fetchSensorPMS(String &s)
 
 		if (cfg::sending_intervall_ms > (WARMUPTIME_SDS_MS + READINGTIME_SDS_MS))
 		{
-			is_PMS_running = PMS_cmd(PmSensorCmd::Stop);
+			is_PMS_running = PMS_sendCmd(PmSensorCmd::Stop);
 		}
 	}
 
@@ -5536,14 +5170,14 @@ static __noinline void fetchSensorHPM(String &s)
 	{
 		if (is_HPM_running)
 		{
-			is_HPM_running = HPM_cmd(PmSensorCmd::Stop);
+			is_HPM_running = HPM_sendCmd(PmSensorCmd::Stop);
 		}
 	}
 	else
 	{
 		if (!is_HPM_running)
 		{
-			is_HPM_running = HPM_cmd(PmSensorCmd::Start);
+			is_HPM_running = HPM_sendCmd(PmSensorCmd::Start);
 		}
 
 		while (serialSDS.available() > 0)
@@ -5663,7 +5297,7 @@ static __noinline void fetchSensorHPM(String &s)
 
 		if (cfg::sending_intervall_ms > (WARMUPTIME_SDS_MS + READINGTIME_SDS_MS))
 		{
-			is_HPM_running = HPM_cmd(PmSensorCmd::Stop);
+			is_HPM_running = HPM_sendCmd(PmSensorCmd::Stop);
 		}
 	}
 
@@ -5671,13 +5305,14 @@ static __noinline void fetchSensorHPM(String &s)
 }
 
 /*****************************************************************
- * read Tera Sensor Next PM sensor sensor values                 *
+ * read Tera Next PM-Sensor get sensor values                    *
  *****************************************************************/
 static void fetchSensorNPM(String &s)
 {
 	debug_outln_verbose(FPSTR(DBG_TXT_START_READING), FPSTR(SENSORS_NPM));
 
-	if (cfg::sending_intervall_ms > (WARMUPTIME_NPM_MS + READINGTIME_NPM_MS) && msSince(starttime) < (cfg::sending_intervall_ms - (WARMUPTIME_NPM_MS + READINGTIME_NPM_MS)))
+	if (cfg::sending_intervall_ms > (WARMUPTIME_NPM_MS + READINGTIME_NPM_MS) && 
+                    msSince(starttime) < (cfg::sending_intervall_ms - (WARMUPTIME_NPM_MS + READINGTIME_NPM_MS)))
 	{
 		if (is_NPM_running && !cfg::npm_fulltime)
 		{
@@ -5703,41 +5338,43 @@ static void fetchSensorNPM(String &s)
 		{ // DIMINUER LE READING TIME
 
 			debug_outln_info(F("Concentration NPM..."));
-			NPM_cmd(PmSensorCmd2::Concentration);
+			NPM_sendCmd(PmSensorCmd2::Concentration);
+
 			while (!serialNPM.available())
 			{
 				debug_outln("Wait for Serial...", DEBUG_MAX_INFO);
-			}
+            }
 
-			while (serialNPM.available() >= NPM_waiting_for_16)
-			{
-				const uint8_t constexpr header[2] = {0x81, 0x11};
-				uint8_t state[1];
-				uint8_t data[12];
-				uint8_t checksum[1];
-				uint8_t test[16];
-				uint16_t N1_serial = 0;
-				uint16_t N25_serial = 0;
-				uint16_t N10_serial = 0;
-				uint16_t pm1_serial = 0;
-				uint16_t pm25_serial = 0;
-				uint16_t pm10_serial = 0;
+            const uint8_t constexpr header[2] = {0x81, 0x11};
+            uint8_t state[1];
+            uint8_t data[12];
+            uint8_t checksum[1];
+            uint8_t test[16];
+            uint16_t N1_serial = 0;
+            uint16_t N25_serial = 0;
+            uint16_t N10_serial = 0;
+            uint16_t pm1_serial = 0;
+            uint16_t pm25_serial = 0;
+            uint16_t pm10_serial = 0;
 
-				switch (NPM_waiting_for_16)
+            while (serialNPM.available() >= NPM_waiting_for_16)
+            {
+                switch (NPM_waiting_for_16)
 				{
 				case NPM_REPLY_HEADER_16:
 					if (serialNPM.find(header, sizeof(header)))
 						NPM_waiting_for_16 = NPM_REPLY_STATE_16;
 					break;
 				case NPM_REPLY_STATE_16:
-					serialNPM.readBytes(state, sizeof(state));
-					current_state_npm = NPM_state(state[0]);
+					serialNPM.readBytes(state, sizeof(state));      // read state byte out receive buiffer
+					current_state_npm = get_NPM_State(state[0]);
 					NPM_waiting_for_16 = NPM_REPLY_BODY_16;
 					break;
 				case NPM_REPLY_BODY_16:
 					if (serialNPM.readBytes(data, sizeof(data)) == sizeof(data))
 					{
 						NPM_data_reader(data, 12);
+
 						N1_serial = word(data[0], data[1]);
 						N25_serial = word(data[2], data[3]);
 						N10_serial = word(data[4], data[5]);
@@ -5766,7 +5403,8 @@ static void fetchSensorNPM(String &s)
 					memcpy(&test[sizeof(header) + sizeof(state)], data, sizeof(data));
 					memcpy(&test[sizeof(header) + sizeof(state) + sizeof(data)], checksum, sizeof(checksum));
 					NPM_data_reader(test, 16);
-					if (NPM_checksum_valid_16(test))
+
+					if (NPM_checksum_valid(test,16))
 					{
 						debug_outln_info(F("Checksum OK..."));
 						npm_pm1_sum += pm1_serial;
@@ -5788,11 +5426,12 @@ static void fetchSensorNPM(String &s)
 						npm_val_count++;
 						debug_outln(String(npm_val_count), DEBUG_MAX_INFO);
 					}
+
 					NPM_waiting_for_16 = NPM_REPLY_HEADER_16;
 					break;
 				}
-			}
-		}
+            }
+        }
 	}
 
 	if (send_now)
@@ -5875,6 +5514,7 @@ static void fetchSensorNPM(String &s)
 		{
 			debug_outln_info(F("Temperature and humidity in NPM after measure..."));
 			current_th_npm = NPM_temp_humi();
+
 			if (is_NPM_running && !cfg::npm_fulltime)
 			{
 				debug_outln_info(F("Change NPM to stop after measure..."));
@@ -5904,7 +5544,7 @@ static void fetchSensorIPS(String &s)
 		if (is_IPS_running)
 		{
 			debug_outln_info(F("Change IPS to stop..."));
-			IPS_cmd(PmSensorCmd3::Stop);
+			IPS_sendCmd(PmSensorCmd3::Stop);
 			is_IPS_running = false;
 		}
 	}
@@ -5913,7 +5553,7 @@ static void fetchSensorIPS(String &s)
 		if (!is_IPS_running)
 		{
 			debug_outln_info(F("Change IPS to start..."));
-			IPS_cmd(PmSensorCmd3::Start);
+			IPS_sendCmd(PmSensorCmd3::Start);
 			is_IPS_running = true;
 		}
 
@@ -5930,7 +5570,7 @@ static void fetchSensorIPS(String &s)
 			// 	Serial.read();
 			// }
 
-			IPS_cmd(PmSensorCmd3::Get);
+			IPS_sendCmd(PmSensorCmd3::Get);
 
 			if (serialIPS.available() > 0)
 			{
@@ -6176,7 +5816,7 @@ static void fetchSensorIPS(String &s)
 			if (is_IPS_running)
 			{
 				debug_outln_info(F("Change IPS to stop after measure..."));
-				IPS_cmd(PmSensorCmd3::Stop);
+				IPS_sendCmd(PmSensorCmd3::Stop);
 				is_IPS_running = false;
 			}
 		}
@@ -6709,7 +6349,7 @@ static void GetAgentData( HTTPClient * http)
 
 	if (cfg::npm_read)
 	{
-		agent += NPM_version_date();
+		agent += NPM_firmware_version();
 	}
 	else if (cfg::ips_read)
 	{
@@ -8062,10 +7702,11 @@ static void powerOnTestSensors()
 	if (cfg::sds_read)
 	{
 		debug_outln_info(F("Read SDS...: "), SDS_version_date());
-		SDS_cmd(PmSensorCmd::ContinuousMode);
+		SDS_sendCmd(PmSensorCmd::ContinuousMode);
 		delay(100);
+
 		debug_outln_info(F("Stopping SDS011..."));
-		is_SDS_running = SDS_cmd(PmSensorCmd::Stop);
+		is_SDS_running = SDS_sendCmd(PmSensorCmd::Stop);
 
 		if( !is_SDS_running)
 		{
@@ -8076,31 +7717,37 @@ static void powerOnTestSensors()
 	if (cfg::pms_read)
 	{
 		debug_outln_info(F("Read PMS(1,3,5,6,7)003..."));
-		PMS_cmd(PmSensorCmd::Start);
+		PMS_sendCmd(PmSensorCmd::Start);
 		delay(100);
-		PMS_cmd(PmSensorCmd::ContinuousMode);
+
+		PMS_sendCmd(PmSensorCmd::ContinuousMode);
 		delay(100);
+
 		debug_outln_info(F("Stopping PMS..."));
-		is_PMS_running = PMS_cmd(PmSensorCmd::Stop);
+		is_PMS_running = PMS_sendCmd(PmSensorCmd::Stop);
 	}
 
 	if (cfg::hpm_read)
 	{
 		debug_outln_info(F("Read HPM..."));
-		HPM_cmd(PmSensorCmd::Start);
+		HPM_sendCmd(PmSensorCmd::Start);
 		delay(100);
-		HPM_cmd(PmSensorCmd::ContinuousMode);
+
+		HPM_sendCmd(PmSensorCmd::ContinuousMode);
 		delay(100);
+
 		debug_outln_info(F("Stopping HPM..."));
-		is_HPM_running = HPM_cmd(PmSensorCmd::Stop);
+		is_HPM_running = HPM_sendCmd(PmSensorCmd::Stop);
 	}
 
 	if (cfg::npm_read)
 	{
+        debug_outln_info(F("Read NPM...: "));
 		uint8_t test_state;
-		delay(15000); // wait a bit to be sure Next PM is ready to receive instructions.
-		test_state = NPM_get_state();
-		
+
+		test_state = NPM_get_State();
+		delay(15000);                   // wait a bit to be sure Tera Next PM is ready to receive instructions.
+
 		if (test_state == 0x00)
 		{
 			debug_outln_info(F("NPM already started..."));
@@ -8174,9 +7821,11 @@ static void powerOnTestSensors()
 			}
 		}
 
-		delay(15000); // prevent any buffer overload on ESP82666
-		NPM_version_date();
-		delay(3000); // prevent any buffer overload on ESP82666
+		delay(15000);       // prevent any buffer overload on ESP82666
+
+		NPM_firmware_version();
+		delay(3000);        // prevent any buffer overload on ESP82666
+
 		NPM_temp_humi();
 		delay(2000);
 
@@ -8193,15 +7842,19 @@ static void powerOnTestSensors()
 
 	if (cfg::ips_read)
 	{
-		IPS_cmd(PmSensorCmd3::Factory); // set to Factory
+		IPS_sendCmd(PmSensorCmd3::Factory); // set to Factory
 		delay(1000);
+
 		IPS_version_date();
 		delay(1000);
-		IPS_cmd(PmSensorCmd3::Smoke); // no smoke detection
+
+		IPS_sendCmd(PmSensorCmd3::Smoke); // no smoke detection
 		delay(1000);
-		IPS_cmd(PmSensorCmd3::Interval); // Set interval to 0 = manual mode
+
+		IPS_sendCmd(PmSensorCmd3::Interval); // Set interval to 0 = manual mode
 		delay(1000);
-		IPS_cmd(PmSensorCmd3::Stop);
+
+		IPS_sendCmd(PmSensorCmd3::Stop);
 		delay(1000);
 		is_IPS_running = false;
 	}
@@ -8647,7 +8300,7 @@ void setup(void)
 #if defined(ESP32)
 		serialNPM.begin(115200, SERIAL_8E1, PM_SERIAL_RX, PM_SERIAL_TX);
 #endif
-		Debug.println("Read Next PM... serialNPM 115200 8E1");
+		Debug.println("Read Next PM... serialNPM: baudrate: 115200, comm. para: 8E1");
 		serialNPM.setTimeout(400);
 	}
 	else if (cfg::ips_read)
@@ -8686,13 +8339,6 @@ void setup(void)
 	digitalWrite(RST_OLED, HIGH);
 #endif
 
-/*	Debug -Tijdelijk verplaatst naar regel 8212 ivm Wifi start langzaam/actief ... 5 minuten..?
-	if(cfg::has_s7000)
-	{
-		SIM700LTEConnect();
-	}
-*/
-
 	init_display();
 	setupNetworkTime();			// set Callback function ptr into NTPSERVER function callback table.
 	connectWifi();
@@ -8719,12 +8365,6 @@ void setup(void)
 		}
 	}
 #endif
-
-	if (cfg::has_s7000)
-	{
-		debug_outln_info(F("\nSim7000 try to connect."));
-		SIM700LTEConnect();
-	}
 
 	if (cfg::gps_read)
 	{

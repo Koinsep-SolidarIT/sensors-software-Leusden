@@ -471,7 +471,7 @@ bool SDS_checksum_valid(const uint8_t (&data)[8])
     return (data[7] == 0xAB && checksum_is == data[6]);
 }
 
-void SDS_rawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint8_t cmd_head3) 
+void SDS_sendRawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint8_t cmd_head3) 
 {
 	constexpr uint8_t cmd_len = 19;
 
@@ -494,20 +494,22 @@ void SDS_rawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint8_t 
 	serialSDS.write(buf, cmd_len);
 }
 
-bool SDS_cmd(PmSensorCmd cmd) 
+bool SDS_sendCmd(PmSensorCmd cmd) 
 {
 	switch (cmd)
 	{
 	case PmSensorCmd::Start:
-		SDS_rawcmd(0x06, 0x01, 0x01);
+		SDS_sendRawcmd(0x06, 0x01, 0x01);
 		break;
+
 	case PmSensorCmd::Stop:
-		SDS_rawcmd(0x06, 0x01, 0x00);
+    SDS_sendRawcmd(0x06, 0x01, 0x00);
 		break;
+
 	case PmSensorCmd::ContinuousMode:
 		// TODO: Check mode first before (re-)setting it
-		SDS_rawcmd(0x08, 0x01, 0x00);
-		SDS_rawcmd(0x02, 0x01, 0x00);
+		SDS_sendRawcmd(0x08, 0x01, 0x00);
+		SDS_sendRawcmd(0x02, 0x01, 0x00);
 		break;
 	}
 
@@ -517,7 +519,7 @@ bool SDS_cmd(PmSensorCmd cmd)
 /*****************************************************************
  * send Plantower PMS sensor command start, stop, cont. mode     *
  *****************************************************************/
-bool PMS_cmd(PmSensorCmd cmd) 
+bool PMS_sendCmd(PmSensorCmd cmd) 
 {
 	static constexpr uint8_t start_cmd[] PROGMEM = {
 		0x42, 0x4D, 0xE4, 0x00, 0x01, 0x01, 0x74
@@ -554,16 +556,20 @@ bool PMS_cmd(PmSensorCmd cmd)
 /*****************************************************************
  * send Honeywell PMS sensor command start, stop, cont. mode     *
  *****************************************************************/
-bool HPM_cmd(PmSensorCmd cmd) {
+bool HPM_sendCmd(PmSensorCmd cmd) 
+{
 	static constexpr uint8_t start_cmd[] PROGMEM = {
 		0x68, 0x01, 0x01, 0x96
 	};
+
 	static constexpr uint8_t stop_cmd[] PROGMEM = {
 		0x68, 0x01, 0x02, 0x95
 	};
+
 	static constexpr uint8_t continuous_mode_cmd[] PROGMEM = {
 		0x68, 0x01, 0x40, 0x57
 	};
+
 	constexpr uint8_t cmd_len = array_num_elements(start_cmd);
 
 	uint8_t buf[cmd_len];
@@ -582,94 +588,131 @@ bool HPM_cmd(PmSensorCmd cmd) {
 	return cmd != PmSensorCmd::Stop;
 }
 
-/*********************************************************************************
- * send Tera Sensor Next PM sensor command state, change, concentration, version *
- *********************************************************************************/
-bool NPM_checksum_valid_4(const uint8_t (&data)[4]) {
-	uint8_t sum = data[0] + data[1] + data[2] + data[3];
-	uint8_t checksum = sum % 0x100;
-	return (checksum == 0);
-}
+/***************************************************************************************
+ * send to Tera Next PM Sensor, command: 'state', 'change', 'concentration', 'version' *
+ ***************************************************************************************/
 
-bool NPM_checksum_valid_5(const uint8_t (&data)[5]) {
-	uint8_t sum = data[0] + data[1] + data[2] + data[3] + data[4];
-	uint8_t checksum = sum % 0x100;
-	return (checksum == 0);
-}
-
-bool NPM_checksum_valid_6(const uint8_t (&data)[6])
+/// @brief NPM checksum valid
+/// @param ptr to data[]
+/// @param lenght of data[]
+/// @return true OK, false CDV faild
+bool NPM_checksum_valid(const uint8_t *data, uint8_t len)
 {
-	uint8_t sum = data[0] + data[1] + data[2] + data[3] + data[4] + data[5];
-	uint8_t checksum = sum % 0x100;
-	return (checksum == 0);
+    uint8_t sum = 0;
+    uint8_t checksum = 0;
+
+    for (uint8_t idx = 0; idx < len; idx++)
+    {
+        sum += *(data + idx);
+    }
+
+    checksum = sum % 0x100;
+    return (checksum == 0);
 }
 
-bool NPM_checksum_valid_8(const uint8_t (&data)[8])
+/// @brief 
+/// @param cmd 
+void NPM_sendCmd(PmSensorCmd2 cmd) 
 {
-	uint8_t sum = data[0] + data[1] + data[2] + data[3] + data[4] + data[5] + data[6] + data[7];
-	uint8_t checksum = sum % 0x100;
-	return (checksum == 0);
-}
-
-bool NPM_checksum_valid_16(const uint8_t (&data)[16]) {
-	uint8_t sum = data[0] + data[1] + data[2] + data[3] + data[4] + data[5] + data[6] + data[7] + data[8] + data[9] + data[10] + data[11] + data[12] + data[13] + data[14] + data[15];
-	uint8_t checksum = sum % 0x100;
-	return (checksum == 0);
-}
-
-void NPM_cmd(PmSensorCmd2 cmd) {
-
 	static constexpr uint8_t state_cmd[] PROGMEM = { //read the current state
 		0x81, 0x16, 0x69
 	};
+
 	static constexpr uint8_t change_cmd[] PROGMEM = { //change the sate alternatively start/stop
 		0x81, 0x15, 0x6A
 	};
+
 	static constexpr uint8_t concentration_cmd[] PROGMEM = { //No continous mode => repeat call
-		0x81, 0x11, 0x6E    //Concentrations reading’s averaged over 10 seconds and updated every 1 second
+		0x81, 0x11, 0x6E        //Concentrations reading’s averaged over 10 seconds and updated every 1 second
 	};
 
 	static constexpr uint8_t version_cmd[] PROGMEM = {
 		0x81, 0x17, 0x68 
 	};
 
-	static constexpr uint8_t speed_cmd[] PROGMEM = {
-		//0x81, 0x21, 0x00, 0x5E //0% to get current value
-		0x81, 0x21, 0x32, 0x2C //50% 
-	};
+	// static constexpr uint8_t speed_cmd[] PROGMEM = {        //0x81, 0x21, 0x00, 0x5E //0% to get current value
+	// 	0x81, 0x21, 0x32, 0x2C  //50% 
+	// };
 
 	static constexpr uint8_t temphumi_cmd[] PROGMEM = {
 		0x81, 0x14, 0x6B
 	};
 
-//0x81 + 0x21 + 0x55 + 0x09 = 0x100
+    //CRC: 0x81 + 0x21 + 0x55 + 0x09 = 0x100
 
-	constexpr uint8_t cmd_len = array_num_elements(change_cmd);
+	/*constexpr*/ uint8_t cmd_len = array_num_elements(version_cmd);  // the larges cammand.
 	uint8_t buf[cmd_len];
 
-	switch (cmd) {
+	switch (cmd) 
+    {
 	case PmSensorCmd2::State:
+        cmd_len = array_num_elements(state_cmd);
 		memcpy_P(buf, state_cmd, cmd_len);
 		break;
 	case PmSensorCmd2::Change:
+        cmd_len = array_num_elements(change_cmd);
 		memcpy_P(buf, change_cmd, cmd_len);
 		break;
 	case PmSensorCmd2::Concentration:
+        cmd_len = array_num_elements(concentration_cmd);
 		memcpy_P(buf, concentration_cmd, cmd_len);
 		break;
 	case PmSensorCmd2::Version:
+        cmd_len = array_num_elements(version_cmd);
 		memcpy_P(buf, version_cmd, cmd_len);
 		break;
-	case PmSensorCmd2::Speed:
-		memcpy_P(buf, speed_cmd, cmd_len);
-		break;
+	// case PmSensorCmd2::Speed:
+	// 	memcpy_P(buf, speed_cmd, cmd_len);
+	// 	break;
 	case PmSensorCmd2::Temphumi:
+        cmd_len = array_num_elements(temphumi_cmd);
 		memcpy_P(buf, temphumi_cmd, cmd_len);
 		break;
 	}
+
 	serialNPM.write(buf, cmd_len);
 }
 
+/*****************************************************************
+ * Helpers : Tera NextP                                          *
+ *****************************************************************/
+void NPM_data_reader(const uint8_t data[], size_t size)
+{
+    String reader = "Read: ";
+    for (size_t i = 0; i < size; i++)
+    {
+        reader += "0x";
+        if (data[i] < 0x10)
+        {
+            reader += "0";
+        }
+
+        reader += String(data[i], HEX);
+        if (i != (size - 1))
+        {
+            reader += ", ";
+        }
+    }
+
+    debug_outln(reader, DEBUG_MAX_INFO);
+}
+
+/// @brief
+/// @param bytedata
+/// @return
+String get_NPM_State(uint8_t bytedata)
+{
+    String state = "State: ";
+
+    for (int b = 7; b >= 0; b--)
+    {
+        state += String(bitRead(bytedata, b));
+    }
+
+    debug_outln(state, DEBUG_MAX_INFO);
+
+    return state;
+}
 
 /*********************************************************************************
  * send Piera Systems IPS7100 sensor command state, change, concentration, version *
@@ -691,9 +734,8 @@ void NPM_cmd(PmSensorCmd2 cmd) {
 	// Lowdata,
 	// Baud
 
-void IPS_cmd(PmSensorCmd3 cmd) 
+void IPS_sendCmd(PmSensorCmd3 cmd) 
 {
-
 	static constexpr char factory_cmd[] PROGMEM = "$Wfactory=\r\n";
 	static constexpr char manual_cmd[] PROGMEM = "$Wmodesel=1\r\n";
 	static constexpr char auto_cmd[] PROGMEM = "$Wmodesel=0\r\n";
@@ -706,77 +748,57 @@ void IPS_cmd(PmSensorCmd3 cmd)
 	static constexpr char lowdata_cmd[] PROGMEM = "$Wldm=1\r\n";
 	static constexpr char baud_cmd[] PROGMEM = "$Wuart=1\r\n"; //9600
 
-	switch (cmd) {
+	switch (cmd) 
+    {
 	case PmSensorCmd3::Factory:
 		serialIPS.print(factory_cmd);
 		break;
+
 	case PmSensorCmd3::Manual:
 		serialIPS.print(manual_cmd);
 		break;
+
 	case PmSensorCmd3::Auto:
 		serialIPS.print(auto_cmd);
 		break;
+
 	case PmSensorCmd3::Reset:
 		serialIPS.print(reset_cmd);
 		break;
+        
 	case PmSensorCmd3::Interval:
 		serialIPS.print(interval_cmd);
 		break;
+
 	case PmSensorCmd3::Get:
 		serialIPS.print(get_cmd);
 		break;
+
 	case PmSensorCmd3::Start:
 		serialIPS.print(start_cmd);
 		break;
+
 	case PmSensorCmd3::Stop:
 		serialIPS.print(stop_cmd);
 		break;
+
 	case PmSensorCmd3::Smoke:
 		serialIPS.print(smoke_cmd);
 		break;
+
 	case PmSensorCmd3::Lowdata:
 		serialIPS.print(lowdata_cmd);
 		break;
+
 	case PmSensorCmd3::Baud:
 		serialIPS.print(baud_cmd);
 		break;
 	}
 }
 
-/*****************************************************************
- * Helpers                                                       *
- *****************************************************************/
-void NPM_data_reader(uint8_t data[], size_t size)
-	{
-		String reader = "Read: ";
-		for (size_t i = 0; i < size; i++)
-		{
-			reader += "0x";
-			if (data[i] < 0x10)
-			{
-				reader += "0";
-			}
-			reader += String(data[i], HEX);
-			if (i != (size - 1))
-			{
-				reader += ", ";
-			}
-		}
-		debug_outln(reader, DEBUG_MAX_INFO);
-	}
-
-String NPM_state(uint8_t bytedata)
-	{
-		String state = "State: ";
-
-		for (int b = 7; b >= 0; b--)
-		{
-			state += String(bitRead(bytedata, b));
-		}
-		debug_outln(state, DEBUG_MAX_INFO);
-		return state;
-	}
-
+/// @brief 
+/// @param i 
+/// @return 
 const __FlashStringHelper* loggerDescription(unsigned i)
 {
     const __FlashStringHelper* logger = nullptr;
