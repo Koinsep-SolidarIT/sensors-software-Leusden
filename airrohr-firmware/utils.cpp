@@ -612,6 +612,24 @@ bool NPM_checksum_valid(const uint8_t *data, uint8_t len)
     return (checksum == 0);
 }
 
+/// @brief : The checksum is calculated in order that the sum of all the frame bytes is 
+///          equal to a multiple of 256 (0x100).
+///
+/// @param data 
+/// @param len 
+/// @return check sum
+uint8_t NPM_Calculate_checksum(const uint8_t *data, uint8_t len)
+{
+    uint8_t sum = 0;
+
+    for (uint8_t idx = 0; idx < len; idx++)
+    {
+        sum += *(data + idx);
+    }
+
+    return 0x100 - sum;
+}
+
 /// @brief 
 /// @param cmd 
 void NPM_sendCmd(PmSensorCmd2 cmd) 
@@ -620,7 +638,7 @@ void NPM_sendCmd(PmSensorCmd2 cmd)
 		0x81, 0x16, 0x69
 	};
 
-	static constexpr uint8_t change_cmd[] PROGMEM = { //change the sate alternatively start/stop
+	static constexpr uint8_t change_cmd[] PROGMEM = { //change the state alternatively start/stop
 		0x81, 0x15, 0x6A
 	};
 
@@ -632,15 +650,20 @@ void NPM_sendCmd(PmSensorCmd2 cmd)
 		0x81, 0x17, 0x68 
 	};
 
-	// static constexpr uint8_t speed_cmd[] PROGMEM = {        //0x81, 0x21, 0x00, 0x5E //0% to get current value
-	// 	0x81, 0x21, 0x32, 0x2C  //50% 
+    // When a 0x21 command frame is sent, the sensor replies using the actual value.
+    ///          The minimum fan speed is set to 30%. 
+    ///          Below this value, the new speed value is not saved and the sensor will use its previous speed value. 
+    ///          Note that if you send a 'NULL' value, the NextPM will send its last memory value.
+    ///
+    ///     CRC: 0x81 + 0x21 + 0x55 + 0x09 = 0x100
+    ///
+	// static constexpr uint8_t speed_cmd[] PROGMEM = {     //0x81, 0x21, 0x00, 0x5E // 0x00 to get current value
+	// 	0x81, 0x21, 0x32, 0x2C                              // 50% 
 	// };
 
 	static constexpr uint8_t temphumi_cmd[] PROGMEM = {
 		0x81, 0x14, 0x6B
 	};
-
-    //CRC: 0x81 + 0x21 + 0x55 + 0x09 = 0x100
 
 	/*constexpr*/ uint8_t cmd_len = array_num_elements(version_cmd);  // the larges cammand.
 	uint8_t sndbuf[cmd_len];
@@ -706,7 +729,7 @@ void NPM_data_reader(const uint8_t data[], size_t size, bool RxdMode)
 /// @brief Display Tera NextPM State value on USB port.
 /// @param bytedata
 /// @return
-String get_NPM_State(uint8_t bytedata)
+String Display_NPM_State(uint8_t bytedata)
 {
     String state = "State: ";
 
