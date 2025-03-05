@@ -261,9 +261,11 @@ String check_display_value(double value, double undef, uint8_t len, uint8_t str_
 	RESERVE_STRING(s, 15);
 	s = (value != undef ? String(value, len) : String("-"));
 
-	while (s.length() < str_len) {
+	while (s.length() < str_len) 
+    {
 		s = " " + s;
 	}
+    
 	return s;
 }
 
@@ -641,44 +643,47 @@ void NPM_sendCmd(PmSensorCmd2 cmd)
     //CRC: 0x81 + 0x21 + 0x55 + 0x09 = 0x100
 
 	/*constexpr*/ uint8_t cmd_len = array_num_elements(version_cmd);  // the larges cammand.
-	uint8_t buf[cmd_len];
+	uint8_t sndbuf[cmd_len];
 
 	switch (cmd) 
     {
 	case PmSensorCmd2::State:
         cmd_len = array_num_elements(state_cmd);
-		memcpy_P(buf, state_cmd, cmd_len);
+		memcpy_P(sndbuf, state_cmd, cmd_len);
 		break;
 	case PmSensorCmd2::Change:
         cmd_len = array_num_elements(change_cmd);
-		memcpy_P(buf, change_cmd, cmd_len);
+		memcpy_P(sndbuf, change_cmd, cmd_len);
 		break;
 	case PmSensorCmd2::Concentration:
         cmd_len = array_num_elements(concentration_cmd);
-		memcpy_P(buf, concentration_cmd, cmd_len);
+		memcpy_P(sndbuf, concentration_cmd, cmd_len);
 		break;
 	case PmSensorCmd2::Version:
         cmd_len = array_num_elements(version_cmd);
-		memcpy_P(buf, version_cmd, cmd_len);
+		memcpy_P(sndbuf, version_cmd, cmd_len);
 		break;
 	// case PmSensorCmd2::Speed:
-	// 	memcpy_P(buf, speed_cmd, cmd_len);
+	// 	memcpy_P(sndbuf, speed_cmd, cmd_len);
 	// 	break;
 	case PmSensorCmd2::Temphumi:
         cmd_len = array_num_elements(temphumi_cmd);
-		memcpy_P(buf, temphumi_cmd, cmd_len);
+		memcpy_P(sndbuf, temphumi_cmd, cmd_len);
 		break;
 	}
 
-	serialNPM.write(buf, cmd_len);
+	serialNPM.write(sndbuf, cmd_len);
+
+    NPM_data_reader(sndbuf, cmd_len, false);
 }
 
 /*****************************************************************
- * Helpers : Tera NextP                                          *
+ * Helpers : Display Tera NextPM data on USB port.               *
  *****************************************************************/
-void NPM_data_reader(const uint8_t data[], size_t size)
+void NPM_data_reader(const uint8_t data[], size_t size, bool RxdMode)
 {
-    String reader = "Read: ";
+    String reader = RxdMode ? F("Read: ") : F("Send: ");
+
     for (size_t i = 0; i < size; i++)
     {
         reader += "0x";
@@ -688,6 +693,7 @@ void NPM_data_reader(const uint8_t data[], size_t size)
         }
 
         reader += String(data[i], HEX);
+
         if (i != (size - 1))
         {
             reader += ", ";
@@ -697,7 +703,7 @@ void NPM_data_reader(const uint8_t data[], size_t size)
     debug_outln(reader, DEBUG_MAX_INFO);
 }
 
-/// @brief
+/// @brief Display Tera NextPM State value on USB port.
 /// @param bytedata
 /// @return
 String get_NPM_State(uint8_t bytedata)

@@ -177,7 +177,7 @@ extern void IPS_sendCmd(PmSensorCmd3 cmd);
 
 extern void NPM_sendCmd(PmSensorCmd2 cmd);
 extern bool NPM_checksum_valid(const uint8_t *data, uint8_t len);
-extern void NPM_data_reader(const uint8_t data[], size_t size);
+extern void NPM_data_reader(const uint8_t data[], size_t size, bool receiveMode = true);
 extern String get_NPM_State(uint8_t bytedata);
 
 extern bool isNumeric(const String& str);
