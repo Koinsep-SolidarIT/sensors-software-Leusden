@@ -69,7 +69,7 @@ Please refer to the [Pinout of NodeMCU v2 and v3](https://github.com/opendata-st
 * Pin 6 (1m)   -> unused
 
 ### Tera NextPM (serial)
-For product information see NextPM hardware guide V3.4.pdf
+For product information see "Doc/NextPM hardware guide V3.4.pdf"
 * Pin 1 (GND)         -> GND
 * Pin 2 (5V)          -> VU
 * Pin 3 (TX)(output)  -> (RX) Pin D1 (GPIO5)
@@ -78,9 +78,10 @@ For product information see NextPM hardware guide V3.4.pdf
 * Pin 6 (GND)         -> GND
 
 **Note**
-        1. The NextPM must be power supplied with +5 VDC / ±0.2V
-        2. Serial connections are always crossed (RX on one side is connected with TX on other side)
-        3. The Tx and Rx signal logical level is TTL (+3.3V)
+        1. SC build for NextPM Version 1.040 and higher.
+        2. The NextPM must be power supplied with +5 VDC / ±0.2V
+        3. Serial connections are always crossed (RX on one side is connected with TX on other side)
+        4. The Tx and Rx signal logical level is TTL (+3.3V)
 
 ### DHT22
 * Pin 1 => 3V3
