@@ -1014,11 +1014,11 @@ static String SDS_version_date()
  *****************************************************************/
 
 /// @brief 
-/// @param ptr to status[] 
+/// @param ptr to status memory.
 /// @return 
 static bool NPM_get_State( uint8_t *status)
 {
-    debug_outln_info(F("Get State NPM..."));
+    debug_outln_verbose(F("Get NPM State..."));
 
 	uint8_t result = 0;
     int reply = 5;
@@ -1026,7 +1026,7 @@ static bool NPM_get_State( uint8_t *status)
 	NPM_sendCmd(PmSensorCmd2::State);
 
 	while (!(result = serialNPM.available()))
-	{// wait till receive response from Tera sensor.
+	{// wait till receive response from NextPM sensor.
 		debug_outln("Wait for NPM State Response...", DEBUG_MAX_INFO);
 
         if( --reply == 0)
@@ -1038,10 +1038,9 @@ static bool NPM_get_State( uint8_t *status)
         delay(500);
     }
 
-    *status = 0b00000100;
-
     debug_outln_verbose(F("NPM available chars: ") + String(result, HEX));
 
+    *status = 0b00000100;
     return Parser_StateValue( status);
 }
 
@@ -1098,7 +1097,7 @@ static bool Parser_StateValue(uint8_t *status)
 
             if (NPM_checksum_valid(test, 4))
             {
-                debug_outln_info(F("NPM Checksum OK..."));
+                debug_outln_verbose(F("NPM Checksum OK..."));
                 result = true;
             }
 
@@ -1207,7 +1206,7 @@ static bool NPM_start_stop(uint8_t *status)
 
             if (NPM_checksum_valid(test, sizeof(test)))
             {
-                debug_outln_info(F("NPM Checksum OK..."));
+                debug_outln_verbose(F("NPM Checksum OK..."));
                 result = true;
             }
 
@@ -1303,7 +1302,7 @@ static String NPM_firmware_version()
 
 			if (NPM_checksum_valid(test, sizeof(test)))
 			{
-				debug_outln_info(F("NPM Checksum OK..."));
+				debug_outln_verbose(F("NPM Checksum OK..."));
 			}
 
 			NPM_data_reader(test, 6);
@@ -1489,7 +1488,7 @@ bool NPM_ReadMeasuredPmValues( uint16_t *pm1, uint16_t *pm25, uint16_t *pm10,
 
             if (NPM_checksum_valid(test, sizeof(test)))
             {
-                debug_outln_info(F("NPM Checksum OK..."));
+                debug_outln_verbose(F("NPM Checksum OK..."));
 
                 *pm1 = pm1_serial;
                 *pm25 = pm25_serial;
@@ -1520,7 +1519,7 @@ bool NPM_ReadMeasuredPmValues( uint16_t *pm1, uint16_t *pm25, uint16_t *pm10,
 /// @return 
 bool NPM_ReadMeasuredTmp_HumPmValues(uint16_t *temp, uint16_t *humi)
 {
-    debug_outln_info(F("Temperature/Humidity in Next PM..."));
+    debug_outln_verbose(F("Temperature/Humidity in Next PM..."));
 
     uint8_t result = 0;
     int reply = 5;
@@ -1600,7 +1599,7 @@ bool NPM_ReadMeasuredTmp_HumPmValues(uint16_t *temp, uint16_t *humi)
 		
 			if (NPM_checksum_valid( &test[0], 8))
 			{
-				debug_outln_info(F("NPM Checksum OK..."));
+				debug_outln_verbose(F("NPM Checksum OK..."));
 			}
 
 	        NPM_data_reader(test, 8);
@@ -2764,13 +2763,22 @@ static void webserver_config_send_body_get(String &page_content)
 	page_content += F("<hr/>");
 	page_content += FPSTR(WEB_BR_LF);
 
-	add_form_checkbox_sensor(Config_scd30_read, FPSTR(INTL_SCD30));
-	page_content += FPSTR(TABLE_TAG_OPEN);
-	add_form_input(page_content, ConfigShapeId::Config_scd30_temp_correction, FPSTR(INTL_TEMP_CORRECTION), LEN_TEMP_CORRECTION - 1);
-	add_form_input(page_content, ConfigShapeId::Config_scd30_co2_correction, FPSTR(INTL_SCD30_CO2_CORRECTION), LEN_DNMS_CORRECTION - 1);
-	page_content += FPSTR(TABLE_TAG_CLOSE_BR);
+    if (cfg::scd30_read)
+    {
+        add_form_checkbox_sensor(Config_scd30_read, FPSTR(INTL_SCD30));
+        page_content += FPSTR(TABLE_TAG_OPEN);
+        add_form_input(page_content, ConfigShapeId::Config_scd30_temp_correction, FPSTR(INTL_TEMP_CORRECTION), LEN_TEMP_CORRECTION - 1);
+        add_form_input(page_content, ConfigShapeId::Config_scd30_co2_correction, FPSTR(INTL_SCD30_CO2_CORRECTION), LEN_DNMS_CORRECTION - 1);
+        page_content += FPSTR(TABLE_TAG_CLOSE_BR);
+    }
+    else
+    {// SEN5X and NPM
+        page_content += FPSTR(TABLE_TAG_OPEN);
+        add_form_input(page_content, ConfigShapeId::Config_scd30_temp_correction, FPSTR(INTL_TEMP_CORRECTION), LEN_TEMP_CORRECTION - 1);
+         page_content += FPSTR(TABLE_TAG_CLOSE_BR);
+    }
 
-	// Paginate page after ~ 1500 Bytes
+    // Paginate page after ~ 1500 Bytes
 	server.sendContent(page_content);
 	page_content = emptyString;
 	page_content += FPSTR(WEB_BR_LF);
@@ -3549,19 +3557,17 @@ static void webserver_status()
 	if (cfg::npm_read)
 	{
 		page_content += FPSTR(EMPTY_ROW);
-		add_table_row_from_value(page_content, FPSTR(SENSORS_NPM), last_value_NPM_version);
+		add_table_row_from_value(page_content, FPSTR(SENSORS_NPM), String(F("Version: ")) + last_value_NPM_version);
 		add_table_row_from_value(page_content, F("Temperature offset: "), String(cfg::scd30_temp_correction) + String("°C"));
+        add_table_row_from_value(page_content, FPSTR(INTL_NPM_FULLTIME), cfg::npm_fulltime == true ? F("enabled") : F("disabled"));
 	}
 
 	if (cfg::scd30_read)
 	{// set data for webpage section SCD-30
-
 		page_content += FPSTR(EMPTY_ROW);
-
 		add_table_row_from_value(page_content,  FPSTR( SENSORS_SCD30), emptyString);
 
 		uint16_t settingVal = 0;
-
 		scd30.getFirmwareVersion(&settingVal);
 		versionHtml = F("Firmware Version:   V ") + String( ((float)settingVal) / 100);
 		versionHtml += String( BR_TAG);
@@ -5678,7 +5684,7 @@ static void fetchSensorNPM(String &s)
 	{
         if (is_NPM_running && !cfg::npm_fulltime)
         {
-            debug_outln_info(F("fetchSensorNPM(): NPM to stop -> sleep mode..."));
+            debug_outln_verbose(F("fetchSensorNPM(): NPM to stop -> sleep mode..."));
 
             NPM_get_State(&test_state);
 
@@ -5694,7 +5700,7 @@ static void fetchSensorNPM(String &s)
 	{
 		if (!is_NPM_running && !cfg::npm_fulltime)
 		{
-			debug_outln_info(F("fetchSensorNPM(): NPM to start-Up..."));
+			debug_outln_verbose(F("fetchSensorNPM(): NPM to start-Up..."));
 
 			is_NPM_running = NPM_start_stop(&test_state);
 		}
@@ -5761,7 +5767,7 @@ static void fetchSensorNPM(String &s)
 				debug_outln_verbose(F("Relative humidity (%): "), String(hum_serial / 100.0f));
             }
 
-            debug_outln( F("reading counter: ") + String(npm_val_count), DEBUG_MAX_INFO);
+            debug_outln_verbose( F("reading counter: "), String(npm_val_count));
         }
 	}
 
@@ -8025,7 +8031,7 @@ static void initNEXTPM()
             is_NPM_running = NPM_start_stop(&test_state);
             test_state |= 0x04;         // set Not ready flag.
 
-            debug_outln_info( F("Force NPM restart..., running flag = ") + String(is_NPM_running)); // to read the firmware version
+            debug_outln_info( F("NPM will be restart..., running flag = ") + String(is_NPM_running)); // to read the firmware version
         }
         else
         {
@@ -8036,7 +8042,7 @@ static void initNEXTPM()
                 is_NPM_running = NPM_start_stop(&test_state);
                 test_state |= 0x04;         // set Not ready flag.
 
-                debug_outln_info(F("Force NPM to be switched on..., running flag = ") + String(is_NPM_running));
+                debug_outln_info(F("NPM to be switched on..., running flag = ") + String(is_NPM_running));
             }
         }
 
@@ -8055,7 +8061,7 @@ static void initNEXTPM()
 
         if (!cfg::npm_fulltime)
         {
-            debug_outln_info(F("NPM in sleep mode..."));
+            debug_outln_info(F("NPM goto sleep mode..."));
 
             NPM_get_State(&test_state);
             if ( bitRead(test_state, 0) == 0)
