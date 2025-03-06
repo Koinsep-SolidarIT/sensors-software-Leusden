@@ -5706,7 +5706,7 @@ static void fetchSensorNPM(String &s)
 		}
         else if ( is_NPM_running && msSince(starttime) > (cfg::sending_intervall_ms - READINGTIME_NPM_MS))
 		{ // DIMINUER LE READING TIME
-			debug_outln_info(F("NPM -> Read Measured PM Values..."));
+			debug_outln_info(F("NPM -> Read Measured PM/Temperature/Humidity Values..."));
 
             uint16_t pm1_serial = 0;
             uint16_t pm25_serial = 0;
