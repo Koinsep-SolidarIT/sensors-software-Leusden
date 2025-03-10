@@ -50,14 +50,20 @@ String sha1Hex(const String& s)
 #endif
 
 	String r;
-	for (uint16_t i = 0; i < 20; i++) {
+	for (uint16_t i = 0; i < 20; i++) 
+    {
 		char hex[3];
 		snprintf(hex, sizeof(hex), "%02x", sha1sum_output[i]);
 		r += hex;
 	}
+
 	return r;
 }
 
+/// @brief 
+/// @param secret 
+/// @param s 
+/// @return 
 String hmac1(const String& secret, const String& s)
 {
 	String str = sha1Hex(s);
@@ -65,6 +71,10 @@ String hmac1(const String& secret, const String& s)
 	return sha1Hex(str);
 }
 
+/// @brief 
+/// @param patt 
+/// @param value 
+/// @return 
 String tmpl(const __FlashStringHelper* patt, const String& value) 
 {
 	String s = patt;
@@ -72,6 +82,12 @@ String tmpl(const __FlashStringHelper* patt, const String& value)
 	return s;
 }
 
+/// @brief 
+/// @param page_content 
+/// @param sensor 
+/// @param param 
+/// @param value 
+/// @param unit 
 void add_table_row_from_value(String& page_content, const __FlashStringHelper* sensor, 
 							  const __FlashStringHelper* param, const String& value, const String& unit) 
 {
@@ -84,6 +100,11 @@ void add_table_row_from_value(String& page_content, const __FlashStringHelper* s
 	page_content += s;
 }
 
+/// @brief 
+/// @param page_content 
+/// @param param 
+/// @param value 
+/// @param unit 
 void add_table_row_from_value(String& page_content, const __FlashStringHelper* param, const String& value, const char* unit) 
 {
 	RESERVE_STRING(s, MED_STR);
@@ -94,19 +115,28 @@ void add_table_row_from_value(String& page_content, const __FlashStringHelper* p
 	page_content += s;
 }
 
+/// @brief 
+/// @param rssi 
+/// @return 
 int32_t calcWiFiSignalQuality(int32_t rssi)
 {
 	// Treat 0 or positive values as 0%
-	if (rssi >= 0 || rssi < -100) {
+	if (rssi >= 0 || rssi < -100) 
+    {
 		rssi = -100;
 	}
 
-	if (rssi > -50) {
+	if (rssi > -50) 
+    {
 		rssi = -50;
 	}
+
 	return (rssi + 100) * 2;
 }
 
+/// @brief 
+/// @param sensor_text 
+/// @return 
 String add_sensor_type(const String& sensor_text) 
 {
 	RESERVE_STRING(s, SMALL_STR);
@@ -121,6 +151,11 @@ String add_sensor_type(const String& sensor_text)
 	return s;
 }
 
+/// @brief 
+/// @param ssid 
+/// @param encryption 
+/// @param rssi 
+/// @return 
 String wlan_ssid_to_table_row(const String& ssid, const String& encryption, int32_t rssi) 
 {
 	String s = F(	"<tr>"
@@ -137,6 +172,9 @@ String wlan_ssid_to_table_row(const String& ssid, const String& encryption, int3
 	return s;
 }
 
+/// @brief 
+/// @param time_ms 
+/// @return 
 String delayToString(unsigned time_ms) 
 {
 
@@ -295,6 +333,9 @@ void add_Value2Json(String& res, const __FlashStringHelper* type, const __FlashS
 	add_Value2Json(res, type, String(value));
 }
 
+/// @brief 
+/// @param correction 
+/// @return 
 float readCorrectionOffset(const char* correction) 
 {
 	char* pEnd = nullptr;
@@ -463,6 +504,9 @@ template<typename T, std::size_t N> constexpr std::size_t array_num_elements(con
 	return N;
 }
 
+/// @brief 
+/// @param data 
+/// @return 
 bool SDS_checksum_valid(const uint8_t (&data)[8]) 
 {
     uint8_t checksum_is = 0;
@@ -473,6 +517,10 @@ bool SDS_checksum_valid(const uint8_t (&data)[8])
     return (data[7] == 0xAB && checksum_is == data[6]);
 }
 
+/// @brief 
+/// @param cmd_head1 
+/// @param cmd_head2 
+/// @param cmd_head3 
 void SDS_sendRawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint8_t cmd_head3) 
 {
 	constexpr uint8_t cmd_len = 19;
@@ -493,9 +541,13 @@ void SDS_sendRawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint
 	buf[16] = 0xFF;
 	buf[17] = cmd_head1 + cmd_head2 + cmd_head3 - 2;
 	buf[18] = 0xAB;
+    
 	serialSDS.write(buf, cmd_len);
 }
 
+/// @brief 
+/// @param cmd 
+/// @return 
 bool SDS_sendCmd(PmSensorCmd cmd) 
 {
 	switch (cmd)
@@ -586,6 +638,7 @@ bool HPM_sendCmd(PmSensorCmd cmd)
 		memcpy_P(buf, continuous_mode_cmd, cmd_len);
 		break;
 	}
+
 	serialSDS.write(buf, cmd_len);
 	return cmd != PmSensorCmd::Stop;
 }
@@ -593,6 +646,15 @@ bool HPM_sendCmd(PmSensorCmd cmd)
 /***************************************************************************************
  * send to Tera Next PM Sensor, command: 'state', 'change', 'concentration', 'version' *
  ***************************************************************************************/
+
+/// @brief Empty serial receive buffer.
+void NPM_serialFlush(void)
+{
+    while (serialNPM.available())
+    {
+        serialNPM.read();
+    }
+}
 
 /// @brief NPM checksum valid
 /// @param ptr to data[]
@@ -705,7 +767,7 @@ void NPM_sendCmd(PmSensorCmd2 cmd)
  *****************************************************************/
 void NPM_data_reader(const uint8_t data[], size_t size, bool RxdMode)
 {
-    String reader = RxdMode ? F("Read: ") : F("Send: ");
+    String reader = RxdMode ? F("Response: ") : F("Send: ");
 
     for (size_t i = 0; i < size; i++)
     {

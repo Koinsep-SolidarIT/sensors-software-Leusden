@@ -180,6 +180,7 @@ extern bool NPM_checksum_valid(const uint8_t *data, uint8_t len);
 extern uint8_t NPM_Calculate_checksum(const uint8_t *data, uint8_t len);
 extern void NPM_data_reader(const uint8_t data[], size_t size, bool receiveMode = true);
 extern String Display_NPM_State(uint8_t bytedata);
+extern void NPM_serialFlush(void);
 
 extern bool isNumeric(const String& str);
 
