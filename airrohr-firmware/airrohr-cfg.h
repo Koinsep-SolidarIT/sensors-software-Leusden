@@ -126,7 +126,6 @@ enum ConfigShapeId {
 	Config_has_fix_ip,
 	Config_scd30_co2_correction,
 	Config_scd30_temp_correction,
-	Config_has_s7000,
 	Config_host_radar,
 	Config_port_radar,
 	Config_motion_wait_time,
@@ -225,7 +224,6 @@ static constexpr char CFG_KEY_SSL_INFLUX[] PROGMEM = "ssl_influx";
 static constexpr char CFG_KEY_HAS_FIX_IP[] PROGMEM = "has_fix_ip";
 static constexpr char CFG_KEY_SCD30_CO2_CORRECTION[] PROGMEM = "scd30_co2_correction";
 static constexpr char CFG_KEY_SCD30_TEMP_CORRECTION[] PROGMEM = "scd30_temp_correction";
-static constexpr char CFG_KEY_HAS_S7000[] PROGMEM = "has_s7000";
 static constexpr char CFG_KEY_HOST_RADAR[] PROGMEM = "host_radar";
 static constexpr char CFG_KEY_PORT_RADAR[] PROGMEM = "port_radar";
 static constexpr char CFG_KEY_MOTION_WAIT_TIME[] PROGMEM = "motion_wait_time";
@@ -324,7 +322,6 @@ static constexpr ConfigShapeEntry configShape[] PROGMEM = {
 	{ Config_Type_Bool, 0, CFG_KEY_HAS_FIX_IP, &cfg::has_fix_ip },
 	{ Config_Type_String, sizeof(cfg::scd30_co2_correction)-1, CFG_KEY_SCD30_CO2_CORRECTION, cfg::scd30_co2_correction },
 	{ Config_Type_String, sizeof(cfg::scd30_temp_correction)-1, CFG_KEY_SCD30_TEMP_CORRECTION, cfg::scd30_temp_correction },
-	{ Config_Type_Bool, 0, CFG_KEY_HAS_S7000, &cfg::has_s7000 },
 	{ Config_Type_String, sizeof(cfg::host_radar)-1, CFG_KEY_HOST_RADAR, cfg::host_radar },
 	{ Config_Type_UInt, 0, CFG_KEY_PORT_RADAR, &cfg::port_radar },
 	{ Config_Type_UInt, 0, CFG_KEY_MOTION_WAIT_TIME, &cfg::motion_wait_time },

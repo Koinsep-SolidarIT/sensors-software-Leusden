@@ -68,6 +68,27 @@ Please refer to the [Pinout of NodeMCU v2 and v3](https://github.com/opendata-st
 * Pin 5 (5V)   -> VU
 * Pin 6 (1m)   -> unused
 
+### Tera NextPM (serial)
+For product information see "Doc/NextPM hardware guide V3.4.pdf"
+* Pin 1 (GND)                             -> GND
+* Pin 2 (5V)                              -> VU
+* Pin 3 (TX)(output)                      -> (RX) Pin D1 (GPIO5)
+* Pin 4 (RX)(input)                       -> (TX) Pin D2 (GPIO4)
+* Pin 5 (CS)(unconnected)(high impedance) -> NC
+* Pin 6 (GND)                             -> GND
+
+**Note**
+        1. SC build for NextPM Version 1.040 and higher.
+        2. The NextPM must be power supplied with +5 VDC / ±0.2V
+        3. Serial connections are always crossed (RX on one side is connected with TX on other side)
+        4. The Tx and Rx signal logical level is TTL (+3.3V)
+        5. The ESP-MCU serial communication must be configured as followed :
+                ● Default baud rate : 115 200
+                ● Number of data bits: 8
+                ● Parity : even
+                ● Number of stop bits: 1
+
+
 ### DHT22
 * Pin 1 => 3V3
 * Pin 2 => Pin D7 (GPIO13)

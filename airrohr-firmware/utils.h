@@ -85,9 +85,9 @@ namespace cfg
 }
 
 #if defined(ESP8266)
-extern SoftwareSerial serialSDS;
-extern SoftwareSerial serialNPM;
-extern SoftwareSerial serialIPS;
+extern SoftwareSerial serialSDS;                   // Serial port to SDS011 sensor hardware.
+extern SoftwareSerial serialNPM;                   // Serial port to Tera NextPM sensor hardware.
+extern SoftwareSerial serialIPS;                   // Serial port to IPS-7100 sensor hardware.
 #endif
 
 #if defined(ESP32)
@@ -103,12 +103,12 @@ enum class PmSensorCmd { // regular PM sensors
 	ContinuousMode
 };
 
-enum class PmSensorCmd2 { // for NPM
+enum class PmSensorCmd2 { // for NPM (Tera NextPM)
 	State,
 	Change,
 	Concentration,
 	Version,
-	Speed,
+	// Speed,
 	Temphumi
 };
 
@@ -167,21 +167,20 @@ extern void debug_outln_info(const __FlashStringHelper* text, float value);
 extern void debug_outln_verbose(const __FlashStringHelper* text, const String& option);
 extern void debug_outln_info_bool(const __FlashStringHelper* text, const bool option);
 
-
 extern bool SDS_checksum_valid(const uint8_t (&data)[8]);
-extern void SDS_rawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint8_t cmd_head3);
-extern bool SDS_cmd(PmSensorCmd cmd);
-extern bool PMS_cmd(PmSensorCmd cmd);
-extern bool HPM_cmd(PmSensorCmd cmd);
-extern void NPM_cmd(PmSensorCmd2 cmd);
-extern void IPS_cmd(PmSensorCmd3 cmd);
-extern bool NPM_checksum_valid_4(const uint8_t (&data)[4]);
-extern bool NPM_checksum_valid_5(const uint8_t (&data)[5]);
-extern bool NPM_checksum_valid_6(const uint8_t (&data)[6]);
-extern bool NPM_checksum_valid_8(const uint8_t (&data)[8]);
-extern bool NPM_checksum_valid_16(const uint8_t (&data)[16]);
-extern void NPM_data_reader(uint8_t data[], size_t size);
-extern String NPM_state(uint8_t bytedata);
+extern void SDS_sendRawcmd(const uint8_t cmd_head1, const uint8_t cmd_head2, const uint8_t cmd_head3);
+extern bool SDS_sendCmd(PmSensorCmd cmd);
+
+extern bool PMS_sendCmd(PmSensorCmd cmd);
+extern bool HPM_sendCmd(PmSensorCmd cmd);
+extern void IPS_sendCmd(PmSensorCmd3 cmd);
+
+extern void NPM_sendCmd(PmSensorCmd2 cmd);
+extern bool NPM_checksum_valid(const uint8_t *data, uint8_t len);
+extern uint8_t NPM_Calculate_checksum(const uint8_t *data, uint8_t len);
+extern void NPM_data_reader(const uint8_t data[], size_t size, bool receiveMode = true);
+extern String Display_NPM_State(uint8_t bytedata);
+extern void NPM_serialFlush(void);
 
 extern bool isNumeric(const String& str);
 

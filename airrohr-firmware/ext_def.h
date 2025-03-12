@@ -113,8 +113,6 @@ static const char MEASUREMENT_NAME_INFLUX[] PROGMEM = "feinstaub";
 #define SSL_INFLUX 0
 #define HAS_FIX_IP 0
 
-// Simm7000
-#define HAS_S7000 0
 #define HAS_GPS 0           // GPS enable
 
 // define MQTT Definitionen
@@ -148,12 +146,6 @@ static const char SERVER_MQTT[]  PROGMEM = "192.168.1.202";
 // define serial interface pins for GPS modules
 #define GPS_SERIAL_RX D5
 #define GPS_SERIAL_TX D6
-
-// define serial interface pins for SIM7000 LTE module
-#define SIM_PIN_RX  12              // Serial RX pin no: D6 -> GPIO12  <---- TX SIM7000
-#define SIM_PIN_TX  14              // Serial TX pin no: D5 -> GPIO14  ----> RX SIM7000
-#define SIM_PIN_PWR 13              // PowerPin no:      D7 -> GPIO13  ----> SIM7000 PWRPIN
-// #define PIN_DTR 25   xx
 
 // define serial interface pins for Next PM Sensor
 #define NPM_SERIAL_RX D1

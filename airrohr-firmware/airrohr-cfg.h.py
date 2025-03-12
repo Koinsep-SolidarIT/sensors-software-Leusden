@@ -91,7 +91,6 @@ Bool		ssl_influx
 Bool		has_fix_ip
 String		scd30_co2_correction
 String		scd30_temp_correction
-Bool        has_s7000
 String		host_radar
 UInt		port_radar
 UInt		motion_wait_time
